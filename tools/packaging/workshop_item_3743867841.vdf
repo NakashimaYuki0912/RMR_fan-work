@@ -2,10 +2,151 @@
 {
 	"appid"		"1256670"
 	"publishedfileid"		"3743867841"
-	"contentfolder"		"E:\\Steam\\steamapps\\workshop\\content\\1256670_BACKUPS\\3743867841_upload"
-	"previewfile"		"E:\\Steam\\steamapps\\workshop\\content\\1256670_BACKUPS\\3743867841_upload\\preview.jpg.png"
+	"contentfolder"		"E:\Steam\steamapps\workshop\content\1256670_BACKUPS\3743867841_upload"
+	"previewfile"		"E:\Steam\steamapps\workshop\content\1256670_BACKUPS\3743867841_upload\preview.jpg.png"
 	"visibility"		"0"
-	"title"		"RMR REBORN fan work [Workshop]"
-	"description"		"[h2]About This Version[/h2]\nThis mod is an unofficial derivative maintenance version based on [i]RogueLike Mod REBORN[/i]. I greatly enjoyed the original mod and wanted to experience more content beyond where its development ended, so I began maintaining and expanding it after official updates ceased.\n\nEvery journey begins at Urban Myth. Players must choose between Normal Battles, Elite Battles, Boss Battles, Shops, Rest Sites, and Mysterious Events while gradually building their team and advancing toward the Impuritas Civitatis endgame.\n\nThis page contains spoilers for the later chapters and ending content of [i]Library of Ruina[/i].\n\nThis version does not represent the original creator, the REBORN team, or Project Moon.\n[h2]Major Changes[/h2]\n[list]\n[*][b]Redesigned RMR Entry and Start Menu[/b]\n\nThe RMR icon in the upper-right corner of the Reception screen now opens a full-screen start menu.\n\nFrom this menu, you can start a new run, continue your current journey, challenge Floor Realizations, view the gameplay guide, access the Permanent Compendium, reset permanent progression, or exit.\n\n[*][b]Added Floor Realization Challenges[/b]\n\nYou can now independently challenge the final Realization battle of each of the ten original Floors.\n\nClearing a Floor Realization for the first time permanently unlocks that Floor's exclusive Abnormality Pages and E.G.O., allowing them to appear in future reward pools and Shop selections.\n\nPreviously cleared Realizations can be challenged again, but their first-clear rewards cannot be obtained more than once.\n\n[*][b]Reworked Abnormality Page Acquisition[/b]\n\nMost regular Abnormality Pages are now obtained through random post-battle rewards, Shops, special events, and other sources.\n\nAbnormality Pages and E.G.O. exclusive to a Floor Realization will only be added to future selection pools after that Floor has been cleared for the first time.\n\n[*][b]Added a Permanent Compendium[/b]\n\nThe Permanent Compendium records all unlocked Key Pages, Combat Pages, Abnormality Pages, and E.G.O.\n\nYou can also use it to inspect their attributes, abilities, and upgraded effects.\n\nWhen challenging a Floor Realization, you can use content recorded in the Permanent Compendium to assemble a temporary team.\n\nAfter the challenge ends, your original run configuration will be restored. The temporary setup will not overwrite or interfere with your normal run save.\n\nThe Permanent Compendium is not the starting inventory for a new run. After beginning a new journey, you must still collect resources and build your team again from scratch.\n\n[*][b]Expanded the Impuritas Civitatis Chapter[/b]\n\nThe standard route now extends into Impuritas Civitatis and includes several Impuritas Civitatis-level Receptions.\n\nPossible final bosses include The Black Silence and the Distorted Reverberation Ensemble. Each run will feature one of them as its final encounter.\n\nDefeating each boss for the first time will also permanently unlock special content, providing additional rewards for future runs.\n\n[*][b]Added Abnormality Battle Nodes[/b]\n\nStarting from Chapter 3, Abnormality Battles may appear along the route.\n\nThese encounters function as high-risk, high-reward Elite Battles and provide additional opportunities to obtain Abnormality Pages.\n\nAbnormality Battle nodes will not appear during Chapters 1 or 2. Any such positions will instead be replaced with Rest Sites.\n[/list]\n[h2]Before Subscribing[/h2]\n[list]\n[*]This version uses the same internal mod ID as the original RMR. Do not enable both versions at the same time. It is recommended that you keep only one of them installed or enabled.\n\n[*]The Continue option is located in the RMR start menu. It will only appear when a valid run save exists.\n\n[*]Starting a new run will overwrite your current run save. Permanent Compendium progress, Floor Realization clear records, and first-clear records for special bosses are stored separately and will be preserved.\n\n[*]Before switching between versions or installing a major update, it is recommended that you back up the [b]LogueSave[/b] save directory.\n\n[*]Known major mod conflict: [url=https://steamcommunity.com/sharedfiles/filedetails/?id=2868713582]Sayo to Everyone[/url].\n\n[*]Simplified Chinese is currently the primary language used for development, maintenance, and testing. English and Korean text are included, but their completeness and accuracy still require further review.\n\n[*]After updating the mod, fully close and restart the game before playing.\n[/list]\n[h2]Bug Reports[/h2]\nThis version is currently developed and maintained by one person with AI assistance. Testing coverage is limited, so issues involving progression, UI display, localization, or mod compatibility may still occur.\n\nIf you encounter a problem, please report it in the comments section of this page.\n\nWhen reporting an issue, please include as much of the following information as possible:\n\n[list]\n[*]Your game language\n\n[*]Your enabled mod list\n\n[*]The current chapter and node\n\n[*]Steps required to reproduce the issue\n\n[*]Relevant screenshots\n\n[*]The Build information and exception messages from [b]Player.log[/b]\n[/list]\nProviding this information will make it much easier to identify and resolve the problem.\n\n[h2]Additional Information[/h2]\n[list]\n[*]If you enjoy the mod, please consider joining the original creator's Discord server and showing your support:\n\n[url=https://discord.com/invite/buC2SHRRGk]RogueLike Mod REBORN Discord[/url]\n\n[*]If you would like to create another derivative version based on this project, the source code is available here:\n\n[url=https://github.com/NakashimaYuki0912/NakashimaYuki0912.github.io]GitHub Repository[/url]\n\nPlease contact me on Discord before beginning your derivative project.\n[/list]"
-	"changenote"		"[h2]2026-07-22 Update[/h2]\n[list]\n[*][b]Key Page hover preview fix[/b]: in the battle-prep inventory, hovering a Key Page now correctly shows the enlarged preview panel on top (it was being painted over by the raised RMR inventory layer).\n[*]The preview layer boost is cleanly restored when the preview hides or when leaving the Key Page tab, so other UI ordering is unaffected.\n[/list]\n\n[h2]2026-07-22 更新[/h2]\n[list]\n[*][b]钥匙页悬停预览修复[/b]：战斗准备界面中，鼠标悬停钥匙页时放大预览面板现在会正确显示在最上层（此前被抬高的RMR库存图层遮挡）。\n[*]预览关闭或离开钥匙页页签时会还原图层设置，不影响其他界面层级。\n[/list]"
+	"title"		"RMR REBORN fan work [Beta]"
+	"description"		"[h2]About This Version[/h2]
+This mod is an unofficial derivative maintenance version based on [i]RogueLike Mod REBORN[/i]. I greatly enjoyed the original mod and wanted to experience more content beyond where its development ended, so I began maintaining and expanding it after official updates ceased.
+
+Every journey begins at Urban Myth. Players must choose between Normal Battles, Elite Battles, Boss Battles, Shops, Rest Sites, and Mysterious Events while gradually building their team and advancing toward the Impuritas Civitatis endgame.
+
+This page contains spoilers for the later chapters and ending content of [i]Library of Ruina[/i].
+
+This version does not represent the original creator, the REBORN team, or Project Moon.
+[h2]Major Changes[/h2]
+[list]
+[*][b]Redesigned RMR Entry and Start Menu[/b]
+
+The RMR icon in the upper-right corner of the Reception screen now opens a full-screen start menu.
+
+From this menu, you can start a new run, continue your current journey, challenge Floor Realizations, view the gameplay guide, access the Permanent Compendium, reset permanent progression, or exit.
+
+[*][b]Added Floor Realization Challenges[/b]
+
+You can now independently challenge the final Realization battle of each of the ten original Floors.
+
+Clearing a Floor Realization for the first time permanently unlocks that Floor's exclusive Abnormality Pages and E.G.O., allowing them to appear in future reward pools and Shop selections.
+
+Previously cleared Realizations can be challenged again, but their first-clear rewards cannot be obtained more than once.
+
+[*][b]Reworked Abnormality Page Acquisition[/b]
+
+Most regular Abnormality Pages are now obtained through random post-battle rewards, Shops, special events, and other sources.
+
+Abnormality Pages and E.G.O. exclusive to a Floor Realization will only be added to future selection pools after that Floor has been cleared for the first time.
+
+[*][b]Added a Permanent Compendium[/b]
+
+The Permanent Compendium records all unlocked Key Pages, Combat Pages, Abnormality Pages, and E.G.O.
+
+You can also use it to inspect their attributes, abilities, and upgraded effects.
+
+When challenging a Floor Realization, you can use content recorded in the Permanent Compendium to assemble a temporary team.
+
+After the challenge ends, your original run configuration will be restored. The temporary setup will not overwrite or interfere with your normal run save.
+
+The Permanent Compendium is not the starting inventory for a new run. After beginning a new journey, you must still collect resources and build your team again from scratch.
+
+[*][b]Expanded the Impuritas Civitatis Chapter[/b]
+
+The standard route now extends into Impuritas Civitatis and includes several Impuritas Civitatis-level Receptions.
+
+Possible final bosses include The Black Silence and the Distorted Reverberation Ensemble. Each run will feature one of them as its final encounter.
+
+Defeating each boss for the first time will also permanently unlock special content, providing additional rewards for future runs.
+
+[*][b]Added Abnormality Battle Nodes[/b]
+
+Starting from Chapter 3, Abnormality Battles may appear along the route.
+
+These encounters function as high-risk, high-reward Elite Battles and provide additional opportunities to obtain Abnormality Pages.
+
+Abnormality Battle nodes will not appear during Chapters 1 or 2. Any such positions will instead be replaced with Rest Sites.
+[/list]
+[h2]Before Subscribing[/h2]
+[list]
+[*]This version uses the same internal mod ID as the original RMR. Do not enable both versions at the same time. It is recommended that you keep only one of them installed or enabled.
+
+[*]The Continue option is located in the RMR start menu. It will only appear when a valid run save exists.
+
+[*]Starting a new run will overwrite your current run save. Permanent Compendium progress, Floor Realization clear records, and first-clear records for special bosses are stored separately and will be preserved.
+
+[*]Before switching between versions or installing a major update, it is recommended that you back up the [b]LogueSave[/b] save directory.
+
+[*]Known major mod conflict: [url=https://steamcommunity.com/sharedfiles/filedetails/?id=2868713582]Sayo to Everyone[/url].
+
+[*]Simplified Chinese is currently the primary language used for development, maintenance, and testing. English and Korean text are included, but their completeness and accuracy still require further review.
+
+[*]After updating the mod, fully close and restart the game before playing.
+[/list]
+[h2]Bug Reports[/h2]
+This version is currently developed and maintained by one person with AI assistance. Testing coverage is limited, so issues involving progression, UI display, localization, or mod compatibility may still occur.
+
+If you encounter a problem, please report it in the comments section of this page.
+
+When reporting an issue, please include as much of the following information as possible:
+
+[list]
+[*]Your game language
+
+[*]Your enabled mod list
+
+[*]The current chapter and node
+
+[*]Steps required to reproduce the issue
+
+[*]Relevant screenshots
+
+[*]The Build information and exception messages from [b]Player.log[/b]
+[/list]
+Providing this information will make it much easier to identify and resolve the problem.
+
+[h2]Additional Information[/h2]
+[list]
+[*]If you enjoy the mod, please consider joining the original creator's Discord server and showing your support:
+
+[url=https://discord.com/invite/buC2SHRRGk]RogueLike Mod REBORN Discord[/url]
+
+[*]If you would like to create another derivative version based on this project, the source code is available here:
+
+[url=https://github.com/NakashimaYuki0912/NakashimaYuki0912.github.io]GitHub Repository[/url]
+
+Please contact me on Discord before beginning your derivative project.
+[/list]"
+	"changenote"		"[h2]2026-07-27 Update[/h2]
+[list]
+[*][b]Continue Run no longer corrupts saves[/b]: restoring a run could throw partway through, which
+left the inventory empty and then wrote that empty state back over the save file. Loading is now
+isolated per step, and a snapshot is never written after a failed load.
+[*][b]Librarian decks restore correctly on the first Continue[/b]: the deck restore ran a per-floor
+carry-limit check before the library floors existed, so every librarian lost their deck unless you
+exited and continued a second time.
+[*][b]Abnormality Battle nodes now appear[/b]: the placeholder stages the route referenced were
+missing from the data files, so every one of these nodes was silently dropped at run start.
+[*][b]Blue Reverberation rewards now unlock[/b]: the core page was looked up by a localization id
+instead of a book id, so it never resolved and neither the key page nor its combat pages were granted.
+[*][b]Chinese text is sharper[/b]: extra glyph padding was being forced on every label, which made
+dense CJK glyphs bleed at the edges.
+[*][b]Faster loading and smoother reward screens[/b]: art assets are indexed once instead of being
+re-scanned on every lookup, book thumbnails are cached, and the post-battle font pass no longer
+sweeps the whole scene.
+[*][b]Key Page hover preview and passive attribution popup layering[/b]: layer changes are now saved
+and restored in pairs instead of being applied one-way, and ESC / the back button can always close
+the attribution popup.
+[*]Floor selection now shows 1 available floor: switching floors only changes the map theme and
+music in this mod, it never consumes a deployment.
+[/list]
+
+[h2]2026-07-27 更新[/h2]
+[list]
+[*][b]继续游戏不再损坏存档[/b]：读档中途出错会导致库存为空，随后又把这个空状态写回存档文件。现在读档逐段隔离，且读档失败后绝不写盘。
+[*][b]首次继续时司书牌组正确恢复[/b]：牌组恢复会在图书馆楼层尚未建立时执行楼层携带上限检查，导致必须退出再继续一次才能拿回牌组。
+[*][b]异想体战斗节点现在会出现[/b]：路线引用的占位关卡在数据文件中缺失，导致这些节点在开局时被静默剔除。
+[*][b]苍蓝残响奖励现在能解锁[/b]：核心书页此前按本地化 ID 而非书页 ID 查找，始终解析失败，角色书页与对应战斗书页都发不出来。
+[*][b]中文显示更锐利[/b]：此前对所有文本强制附加了额外字形边距，导致笔画密集的中文边缘互相渗透。
+[*][b]载入更快、奖励界面更流畅[/b]：美术资源改为建立索引而非每次查找都重扫目录，书页缩略图加入缓存，战后字体修复不再扫描整个场景。
+[*][b]钥匙页悬停预览与被动分配窗口图层[/b]：图层调整改为成对保存与还原，不再是单向施加；ESC 与返回键现在总能关闭分配窗口。
+[*]楼层选择现在显示可接待楼层为 1：本模组中切换楼层仅改变地图主题与背景音乐，不消耗接待次数。
+[/list]"
 }

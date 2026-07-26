@@ -111,10 +111,10 @@ Please contact me on Discord before beginning your derivative project.
 			
 
 	$J( function() {
-		InitializeCommentThread( "PublishedFile_Public", "PublishedFile_Public_76561198981424151_3743867841", {"feature":"3743867841","feature2":-1,"owner":"76561198981424151","total_count":3,"start":0,"pagesize":10,"has_upvoted":0,"upvotes":0,"votecountid":null,"voteupid":null,"commentcountid":null,"subscribed":false,"extended_data":"{\"contributors\":[\"76561198981424151\",{}],\"appid\":1256670,\"sharedfile\":{\"m_parentsDetails\":null,\"m_parentBundlesDetails\":null,\"m_bundledChildren\":[],\"m_ownedBundledItems\":[]},\"parent_item_reported\":false}"}, 'https://steamcommunity.com/comment/PublishedFile_Public/', 40 );
+		InitializeCommentThread( "PublishedFile_Public", "PublishedFile_Public_76561198981424151_3743867841", {"feature":"3743867841","feature2":-1,"owner":"76561198981424151","total_count":9,"start":0,"pagesize":10,"has_upvoted":0,"upvotes":0,"votecountid":null,"voteupid":null,"commentcountid":null,"subscribed":false,"extended_data":"{\"contributors\":[\"76561198981424151\",{}],\"appid\":1256670,\"sharedfile\":{\"m_parentsDetails\":null,\"m_parentBundlesDetails\":null,\"m_bundledChildren\":[],\"m_ownedBundledItems\":[]},\"parent_item_reported\":false}"}, 'https://steamcommunity.com/comment/PublishedFile_Public/', 40 );
 	} );
 
 	
 		
 			
-									3 Comments
+									9 Comments
