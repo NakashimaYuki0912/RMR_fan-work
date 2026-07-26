@@ -969,7 +969,20 @@ namespace abcdcode_LOGLIKE_MOD
             foreach (SaveData data in save.GetData("playerBattleModel"))
             {
                 data.Log("CURRENTLY INITIALIZING UNIT NUMBER: " + index1.ToString());
-                LogueBookModels.LoadFromSaveData_UnitBattleDataModel(data, LogueBookModels.playerBattleModel[index1]);
+                // Per-unit guard: one librarian whose saved deck references content that no longer
+                // resolves must not abort the whole load. Losing that unit's deck is recoverable in
+                // the prep screen; losing the run is not.
+                try
+                {
+                    if (index1 < LogueBookModels.playerBattleModel.Count)
+                        LogueBookModels.LoadFromSaveData_UnitBattleDataModel(data, LogueBookModels.playerBattleModel[index1]);
+                    else
+                        Debug.LogWarning($"[RMR] LoadFromSaveData: save has more units than the current party ({index1}); entry skipped.");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[RMR] LoadFromSaveData: unit {index1} failed to restore; continuing with the rest of the save. {ex}");
+                }
                 ++index1;
             }
             // Everything between the party and the inventory is optional run state. It used to run

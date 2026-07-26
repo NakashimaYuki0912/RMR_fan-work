@@ -801,6 +801,40 @@ namespace abcdcode_LOGLIKE_MOD
         }
 
         /// <summary>
+        /// Vanilla prints "Floors Available: {StageClassInfo.floorNum}" -- the *configured maximum*
+        /// number of floors a reception may deploy from, each normally consumed once
+        /// (GetAvailableFloorNumber == floorNum - usedFloorList.Count).
+        ///
+        /// RMR does not use floors that way: picking a sephirah only changes the map theme and BGM,
+        /// the roster never changes, and switching is meant to be free and repeatable. Showing 10
+        /// tells the player they have ten deployments left, which is simply not what the number
+        /// means here.
+        ///
+        /// Display-only on purpose. floorNum is left alone because GetAvailableFloorList -- the call
+        /// that actually decides which sephirah buttons can be picked -- filters on
+        /// floorOnlyList/exceptFloorList and never reads floorNum; lowering the field would change
+        /// GetAvailableFloorNumber for anything that consumes it while fixing nothing on screen.
+        /// </summary>
+        [HarmonyPostfix, HarmonyPatch(typeof(UIBattleSettingPanel), "SetButtonText")]
+        public static void UIBattleSettingPanel_SetButtonText_FloorCount(UIBattleSettingPanel __instance)
+        {
+            if (__instance == null || !LogLikeRoutines.IsRoguelikeBattleSettingContext())
+                return;
+            try
+            {
+                FieldInfo fi = AccessTools.Field(typeof(UIBattleSettingPanel), "txt_FloorText");
+                TextMeshProUGUI txt = fi?.GetValue(__instance) as TextMeshProUGUI;
+                if (txt == null)
+                    return;
+                txt.text = TextDataModel.GetText("ui_battlesetting_possiblefloor") + " 1";
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR UI] floor-count label rewrite failed: " + ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Remove any RMR_FloorLabel under a sephirah button (prepare/编队 should not label floors).
         /// Also covers realization prepare which reuses UIBattleSettingPanel.
         /// </summary>
@@ -2302,10 +2336,58 @@ namespace abcdcode_LOGLIKE_MOD
           UnitDataModel self,
           LorId cardId)
         {
+            // A card id that resolves to nothing makes vanilla AddCardFromInventory dereference null.
+            // Continue-load restores each librarian's deck through here from the Invitation screen,
+            // where IsRoguelikeBattleSettingContext() is false, so the early-return below used to
+            // hand the bad id straight to vanilla and the NRE aborted the entire save load
+            // ("继续失败：存档未能完整加载"). One stale card must cost one card, not the save.
+            try
+            {
+                if (cardId == null || ItemXmlDataList.instance.GetCardItem(cardId) == null)
+                {
+                    Debug.LogWarning($"[RMR] AddCardFromInventory: unresolvable card {cardId} skipped (deck entry dropped).");
+                    return CardEquipState.ERROR;
+                }
+            }
+            catch { /* resolution itself failed; fall through to the existing paths */ }
+
+            // Restoring a save: vanilla checks the per-floor carry limit via
+            //   LibraryModel.Instance.GetFloor(OwnerSephirah).GetEquipedUnitList_partial(cardId).Count
+            // and the library floors do not exist yet when Continue runs from the Invitation screen,
+            // so GetFloor returns null and every librarian's deck failed to restore on the first
+            // attempt (a second Continue worked because the library was built by then).
+            // The saved deck was already legal when it was written, so equip directly and skip a
+            // check that cannot be evaluated at this point anyway.
+            try
+            {
+                if (LogLikeMod.saveloading && self != null && self.bookItem != null)
+                    return self.bookItem.AddCardFromInventoryToCurrentDeck(cardId);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR] AddCardFromInventory during save load failed: " + ex.Message);
+                return CardEquipState.ERROR;
+            }
+
             // Must stay false during vanilla library LoadPlayDataFromSaveFile / EquipBook.
             // Wrong true here re-enters BookModel hook and can crash the whole save load.
             if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
+            {
+                // Same null the FloorLimit path trips over, just outside a save load.
+                if (self == null || self.bookItem == null || LibraryModel.Instance == null
+                    || LibraryModel.Instance.GetFloor(self.OwnerSephirah) == null)
+                {
+                    Debug.LogWarning($"[RMR] AddCardFromInventory: library not ready for {cardId}; equipping without the floor-limit check.");
+                    try
+                    {
+                        return self?.bookItem != null
+                            ? self.bookItem.AddCardFromInventoryToCurrentDeck(cardId)
+                            : CardEquipState.ERROR;
+                    }
+                    catch { return CardEquipState.ERROR; }
+                }
                 return orig(self, cardId);
+            }
             try
             {
                 if (self == null || self.bookItem == null)
