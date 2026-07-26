@@ -49,7 +49,7 @@ namespace abcdcode_LOGLIKE_MOD
             string str = save.GetString("TypeName");
             foreach (Assembly assem in LogLikeMod.GetAssemList())
             {
-                foreach (System.Type type in assem.GetTypes())
+                foreach (System.Type type in LogLikeMod.GetLoadableTypes(assem))
                 {
                     if (type.Name == str)
                         return Activator.CreateInstance(type) as LogStatAdder;

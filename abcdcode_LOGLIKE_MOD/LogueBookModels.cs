@@ -842,22 +842,13 @@ namespace abcdcode_LOGLIKE_MOD
             return data1;
         }
 
-        public static void LoadFromSaveData(SaveData save)
+        /// <summary>
+        /// Picks, per-unit passives/stat adders, shop state, emotion selection and the remaining
+        /// stage list. Separated from <see cref="LoadFromSaveData"/> so a failure here cannot skip
+        /// the inventory load that follows it.
+        /// </summary>
+        private static void LoadOptionalRunState(SaveData save)
         {
-            LogueBookModels.CreatePlayer();
-            LogueBookModels.CreatePlayerBattle();
-            if (save.GetData("SubPlayerNum").GetIntSelf() > 0)
-            {
-                for (int index = 0; index < save.GetData("SubPlayerNum").GetIntSelf(); ++index)
-                    LogueBookModels.AddSubPlayer();
-            }
-            int index1 = 0;
-            foreach (SaveData data in save.GetData("playerBattleModel"))
-            {
-                data.Log("CURRENTLY INITIALIZING UNIT NUMBER: " + index1.ToString());
-                LogueBookModels.LoadFromSaveData_UnitBattleDataModel(data, LogueBookModels.playerBattleModel[index1]);
-                ++index1;
-            }
             foreach (KeyValuePair<string, SaveData> keyValuePair in save.GetData("playersPick").GetDictionarySelf())
             {
                 KeyValuePair<string, SaveData> dic = keyValuePair;
@@ -948,12 +939,52 @@ namespace abcdcode_LOGLIKE_MOD
                         if (stageInfo != null)
                         {
                             if (!string.IsNullOrEmpty(stageInfo.script))
-                                LogLikeMod.FindPickUp(stageInfo.script).LoadFromSaveData(stageInfo);
+                            {
+                                // FindPickUp returns null for a script whose PickUpModel_* type is
+                                // gone (removed companion mod, renamed class). Keep the node.
+                                PickUpModelBase pickUp = LogLikeMod.FindPickUp(stageInfo.script);
+                                if (pickUp != null)
+                                    pickUp.LoadFromSaveData(stageInfo);
+                                else
+                                    Debug.LogWarning($"[RMR] LoadOptionalRunState: no PickUpModel for script '{stageInfo.script}'; stage kept without pickup state.");
+                            }
                             logueStageInfoList.Add(stageInfo);
                         }
                     }
                     LogueBookModels.RemainStageList.Add(key, logueStageInfoList);
                 }
+            }
+        }
+
+        public static void LoadFromSaveData(SaveData save)
+        {
+            LogueBookModels.CreatePlayer();
+            LogueBookModels.CreatePlayerBattle();
+            if (save.GetData("SubPlayerNum").GetIntSelf() > 0)
+            {
+                for (int index = 0; index < save.GetData("SubPlayerNum").GetIntSelf(); ++index)
+                    LogueBookModels.AddSubPlayer();
+            }
+            int index1 = 0;
+            foreach (SaveData data in save.GetData("playerBattleModel"))
+            {
+                data.Log("CURRENTLY INITIALIZING UNIT NUMBER: " + index1.ToString());
+                LogueBookModels.LoadFromSaveData_UnitBattleDataModel(data, LogueBookModels.playerBattleModel[index1]);
+                ++index1;
+            }
+            // Everything between the party and the inventory is optional run state. It used to run
+            // unguarded, so one bad entry (a third-party assembly failing GetTypes, a missing pickup
+            // script) aborted the whole method — and cardlist/booklist, which load LAST, stayed at the
+            // empty lists CreatePlayer() had just reset them to. The run then looked like every key
+            // page and combat page had been deleted. Losing some optional state is recoverable;
+            // losing the inventory is not, so this must never take the inventory down with it.
+            try
+            {
+                LoadOptionalRunState(save);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[RMR] LoadFromSaveData: optional run state failed to load; inventory load continues. " + ex);
             }
             LogueBookModels.EnsureRemainStageListIntegrity();
             foreach (SaveData saveData in save.GetData("cardlist"))

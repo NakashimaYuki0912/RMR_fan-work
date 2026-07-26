@@ -327,7 +327,7 @@ namespace abcdcode_LOGLIKE_MOD
         {
             foreach (Assembly assem in LogLikeMod.GetAssemList())
             {
-                foreach (System.Type type in assem.GetTypes())
+                foreach (System.Type type in LogLikeMod.GetLoadableTypes(assem))
                 {
                     if (type.Name == "ShopModel_" + script.Trim())
                         return Activator.CreateInstance(type) as ShopBase;

@@ -58,7 +58,7 @@ namespace abcdcode_LOGLIKE_MOD
             Debug.Log(("CGEBS tryfind : " + stringSelf));
             foreach (Assembly assem in LogLikeMod.GetAssemList())
             {
-                foreach (System.Type type in assem.GetTypes())
+                foreach (System.Type type in LogLikeMod.GetLoadableTypes(assem))
                 {
                     if (type.Name == stringSelf)
                     {

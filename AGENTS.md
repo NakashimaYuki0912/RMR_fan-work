@@ -159,7 +159,7 @@ LoR-RMR 把《Library of Ruina》改成按章节推进的 Roguelike：普通战 
 
 - 专属奖励仅首胜后进入商店 / 结算候选；仍去重、未拥有、升级过滤。
 - E.G.O. ID 段见历史表（910001–910005 历史层 … 910086–910090 总类层）。
-- 科技层终局三选一（**EmotionLevel 3**，队伍情感 **5**）：音乐/旋律、棺柩、黑炎  
+- 科技层终局三选一（**EmotionLevel 3**，队伍情感 **5**）：**音乐**、**棺柩**、**黑炎**  
   (`SingingMachine1` / `Butterfly3` / `freischutz3`)。
 - **中段情感选书**（非解放奖励池）规则：
 
@@ -171,6 +171,29 @@ LoR-RMR 把《Library of Ruina》改成按章节推进的 Roguelike：普通战 
 
   实现：`GetRequiredAbnoTierForTeamEmotion` + `IsOwnedPageEligibleForTeamEmotion`。  
   模组 script 必须 `ModScriptToVanillaScript` 后查层；**未知 script 排除，禁止当 Tier I**。
+
+#### 3.4.1 script 后缀数字 **不是** 页阶（误报高发区）
+
+52 组异想体里有 **50 组**后缀顺序与 EmotionLevel 不一致。判定页阶只看 EmotionLevel，
+**永远不要从脚本名末尾的数字推断**。
+
+| 脚本 | 中文名 | EmotionLevel |
+|---|---|:---:|
+| `SingingMachine1` | 音乐 | **III** |
+| `SingingMachine2` | **旋律** | **I** |
+| `SingingMachine3` | 成瘾 | II |
+| `Butterfly1` | 安息 | II |
+| `Butterfly2` | **哀悼** | **I** |
+| `Butterfly3` | 棺柩 | **III** |
+
+因此：**情感 1–2 出现「旋律」「哀悼」「今日的表情」是正确行为，不是 bug。**
+只有「音乐 / 棺柩 / 黑炎」这类 EmotionLevel 3 的页出现在低情感才是故障。
+
+核对来源（按可信度）：
+
+1. 运行期 `EmotionCardXmlList`（`RegisterEmotionCardTier` 直接覆盖静态种子，以游戏数据为准）
+2. `SeedStaticVanillaEmotionTiers` 静态种子（加载前兜底）
+3. `tools/_vanilla_emotion_level_map.txt` 参考表（150 条，已与静态种子核对：0 冲突 0 遗漏）
 
 ### 3.5 中段 E.G.O. 与手牌
 

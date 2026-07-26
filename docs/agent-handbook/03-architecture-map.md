@@ -53,13 +53,18 @@ RMR_Core (ModInitializer)
 
 | 队伍情感 | 需要页阶 (EmotionLevel) | 例子 |
 |:---:|:---:|---|
-| 1–2 | I (1) | 今日的表情 `shyLook` / `ShyLookToday1` |
-| 3–4 | II (2) | 中阶页 |
-| 5 | III (3) | 科技终局：音乐/旋律、棺柩、黑炎 |
+| 1–2 | I (1) | 今日的表情 `ShyLookToday1`、**旋律 `SingingMachine2`**、**哀悼 `Butterfly2`** |
+| 3–4 | II (2) | 成瘾 `SingingMachine3`、安息 `Butterfly1` |
+| 5 | III (3) | 科技终局：**音乐 `SingingMachine1`**、棺柩 `Butterfly3`、黑炎 `freischutz3` |
 
 - 模组 script（`SingingMachine1`）必须映射到原版 script（`singingMachine`）再查 EmotionLevel  
 - 未知页：**排除**（禁止再当 Tier I 倾倒）  
 - 参考：`tools/_vanilla_emotion_level_map.txt`、`GetVanillaAbnoTierForScript`
+
+> **后缀数字不是页阶。** 52 组异想体里 50 组的后缀顺序与 EmotionLevel 不一致
+> （`SingingMachine1`=III 而 `SingingMachine2`=I；`Butterfly2`=I 而 `Butterfly3`=III）。
+> 收到「低情感出现某某页」的反馈时，**先查这张页真实的 EmotionLevel**，不要看名字或后缀。
+> 详见 `AGENTS.md` §3.4.1。
 
 ### 中段 E.G.O.
 

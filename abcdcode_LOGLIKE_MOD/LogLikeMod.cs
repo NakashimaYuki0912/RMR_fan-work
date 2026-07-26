@@ -421,10 +421,10 @@ namespace abcdcode_LOGLIKE_MOD
                 // LocalizedFontSetter.SetLocalizedFont — not font_NotoSans (that's the en path).
                 // Only auto-re-resolve when missing, Fallback face, empty name, or soft OS dynamic face.
                 // Never keep empty-name / soft OS faces — they render CN as blurry mush.
+                // Also drop a face that belongs to another script: switching en→cn used to keep the
+                // Korean face cached, because Noto CJK kr answers the Han glyph probe.
                 if (LogLikeMod._DefFont_TMP != null
-                    && (string.IsNullOrEmpty(LogLikeMod._DefFont_TMP.name)
-                        || IsLowQualityTmpFont(LogLikeMod._DefFont_TMP)
-                        || IsTmpFallbackFaceName(LogLikeMod._DefFont_TMP.name ?? "")))
+                    && !IsCachedDefFontStillGood(LogLikeMod._DefFont_TMP, ResolveInitialTextLanguage()))
                 {
                     LogLikeMod._DefFont_TMP = null;
                 }
@@ -446,7 +446,13 @@ namespace abcdcode_LOGLIKE_MOD
                     }
                     if (LogLikeMod._DefFont_TMP != null)
                     {
-                        Debug.Log($"[RMR Localize] DefFont_TMP = '{LogLikeMod._DefFont_TMP.name}' for lang={ResolveInitialTextLanguage()}.");
+                        string resolvedLang = ResolveInitialTextLanguage();
+                        Debug.Log($"[RMR Localize] DefFont_TMP = '{LogLikeMod._DefFont_TMP.name}' for lang={resolvedLang}.");
+                        // Accept the resolver's verdict for this language. On a setup that genuinely has
+                        // no sc face it may return a kr last resort; without this the region gate would
+                        // discard it and re-resolve on every single read.
+                        _defFontValidatedFace = LogLikeMod._DefFont_TMP;
+                        _defFontValidatedLang = resolvedLang;
                         ApplyMatchedFontToLocalizedSetter(LogLikeMod._DefFont_TMP);
                     }
                 }
@@ -462,9 +468,7 @@ namespace abcdcode_LOGLIKE_MOD
                     return;
                 }
                 string lang = ResolveInitialTextLanguage();
-                if (IsLowQualityTmpFont(value)
-                    || IsTmpFallbackFaceName(value.name ?? "")
-                    || !IsTmpFontCompatibleWithLanguage(value, lang))
+                if (!IsUsableLanguageFace(value, lang))
                 {
                     Debug.LogWarning($"[RMR Localize] Rejected DefFont_TMP='{value.name}' (lang={lang}); keeping '{LogLikeMod._DefFont_TMP?.name ?? "null"}'.");
                     return;
@@ -486,11 +490,9 @@ namespace abcdcode_LOGLIKE_MOD
             try
             {
                 string lang = ResolveInitialTextLanguage();
-                // Force re-resolve if cache is bad; getter also patches setter.
+                // Force re-resolve if cache is bad or belongs to another script; getter also patches setter.
                 if (LogLikeMod._DefFont_TMP != null
-                    && (IsLowQualityTmpFont(LogLikeMod._DefFont_TMP)
-                        || IsTmpFallbackFaceName(LogLikeMod._DefFont_TMP.name ?? "")
-                        || !IsTmpFontCompatibleWithLanguage(LogLikeMod._DefFont_TMP, lang)))
+                    && !IsCachedDefFontStillGood(LogLikeMod._DefFont_TMP, lang))
                     LogLikeMod._DefFont_TMP = null;
 
                 TMP_FontAsset font = LogLikeMod.DefFont_TMP;
@@ -546,11 +548,14 @@ namespace abcdcode_LOGLIKE_MOD
                     if (tmp == null || !tmp.isActiveAndEnabled)
                         continue;
                     TMP_FontAsset cur = tmp.font;
+                    // Judge by stripped name: vanilla Chinese text legitimately runs on
+                    // '[Fallback_N]NotoSansCJKsc-Regular SDF', and re-fonting it churned working UI.
+                    // The text check is separate on purpose: under an English UI the face is a valid
+                    // en face, so only the *content* reveals that it is about to draw tofu.
                     bool bad = cur == null
                         || string.IsNullOrEmpty(cur.name)
-                        || IsLowQualityTmpFont(cur)
-                        || IsTmpFallbackFaceName(cur.name ?? "")
-                        || !IsTmpFontCompatibleWithLanguage(cur, lang);
+                        || !IsUsableLanguageFace(cur, lang)
+                        || TextWouldTofu(cur, tmp.text);
                     if (!bad)
                         continue; // skip material rebind pass — was expensive and rarely needed
                     if (ApplyTmpFontPreservingSharpMaterial(tmp, font))
@@ -721,12 +726,19 @@ namespace abcdcode_LOGLIKE_MOD
             }
             catch { /* optional component */ }
 
-            // Slightly better SDF sampling at small UI sizes (safe no-op if property missing in older TMP).
+            // extraPadding used to be forced true here "for better sampling at small sizes". It does
+            // the opposite on CJK: it widens the sampled glyph region so the SDF edge bleeds, and
+            // dense Chinese glyphs come out soft/smeared. It was applied to every TMP unconditionally,
+            // including ones that were already rendering correctly. Restore the vanilla setting.
             try
             {
                 PropertyInfo extra = tmp.GetType().GetProperty("extraPadding", BindingFlags.Instance | BindingFlags.Public);
-                if (extra != null && extra.CanWrite)
-                    extra.SetValue(tmp, true, null);
+                if (extra != null && extra.CanWrite && extra.CanRead)
+                {
+                    object cur = extra.GetValue(tmp, null);
+                    if (cur is bool && (bool)cur)
+                        extra.SetValue(tmp, false, null);
+                }
             }
             catch { /* ignore */ }
 
@@ -748,6 +760,163 @@ namespace abcdcode_LOGLIKE_MOD
         }
 
         /// <summary>
+        /// "[Fallback_1]NotoSansCJKsc-Regular SDF" is only TMP's runtime label for an asset that also
+        /// lives in some fallback table — the asset itself is the authored face. Vanilla stores exactly
+        /// that in cnFont_notoSansCJKsc, so region / weight tests must read the stripped name.
+        /// </summary>
+        private static string StripTmpFallbackPrefix(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return string.Empty;
+            string s = name.Trim();
+            if (s.StartsWith("[", StringComparison.Ordinal))
+            {
+                int close = s.IndexOf(']');
+                if (close > 1 && s.IndexOf("Fallback", 1, close - 1, StringComparison.OrdinalIgnoreCase) >= 0)
+                    s = s.Substring(close + 1).TrimStart();
+            }
+            else if (s.StartsWith("Fallback_", StringComparison.OrdinalIgnoreCase)
+                || s.StartsWith("Fallback ", StringComparison.OrdinalIgnoreCase))
+            {
+                int sep = s.IndexOf(' ');
+                if (sep > 0)
+                    s = s.Substring(sep + 1).TrimStart();
+            }
+            return s;
+        }
+
+        /// <summary>Classify a TMP face as CJK script region: "sc" / "kr" / "jp" / "" when unknown.</summary>
+        private static string GetFaceScriptRegion(string faceName)
+        {
+            string n = StripTmpFallbackPrefix(faceName);
+            if (string.IsNullOrEmpty(n))
+                return string.Empty;
+            if (n.IndexOf("CJKsc", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("CJKtc", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("Hans", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("Hant", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("SansSC", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("SerifSC", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "sc";
+            if (n.IndexOf("CJKkr", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("SansKR", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("SerifKR", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("Namsan", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("Arita", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "kr";
+            if (n.IndexOf("CJKjp", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("SansJP", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("SerifJP", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("Shippori", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("Mincho", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("logoTypeGothic", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "jp";
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// Noto CJK is pan-CJK: the kr face answers HasCharacter for 图/汉/语, so a glyph probe alone
+        /// cannot keep 'NotoSerifCJKkr-Medium SDF' out of the Chinese slots. It got in, and every
+        /// Chinese glyph then came from a Korean Serif Medium atlas — the "CN font is blurry" report.
+        /// Script region has to be asserted separately.
+        /// </summary>
+        private static bool IsFaceRegionAcceptableForLanguage(string faceName, string language)
+        {
+            string region = GetFaceScriptRegion(faceName);
+            if (string.IsNullOrEmpty(region))
+                return true; // unrecognised face name — leave the decision to glyph coverage
+            string lang = CanonicalizeTextLanguage(language);
+            if (lang == "cn" || lang == "trcn")
+                return region == "sc";
+            if (lang == "kr")
+                return region == "kr";
+            if (lang == "jp")
+                return region == "jp";
+            return true; // en and others: vanilla itself renders this path with kr faces
+        }
+
+        /// <summary>
+        /// Face is renderable for this language, ignoring TMP's "[Fallback_N]" label.
+        /// Use for judging faces vanilla already installed; use IsTmpFontCompatibleWithLanguage when
+        /// picking a *new* primary (there a Fallback-labelled scan hit may be a partial atlas).
+        /// </summary>
+        private static bool IsUsableLanguageFace(TMP_FontAsset font, string language)
+        {
+            return font != null
+                && !IsLowQualityTmpFont(font)
+                && IsFaceRegionAcceptableForLanguage(font.name ?? "", language)
+                && FontCoversLanguageProbes(font, language);
+        }
+
+        private static bool IsCjkOrKana(char c)
+        {
+            return (c >= '一' && c <= '鿿')   // CJK unified
+                || (c >= '㐀' && c <= '䶿')   // CJK ext A
+                || (c >= '가' && c <= '힯')   // Hangul syllables
+                || (c >= '぀' && c <= 'ヿ');  // Kana
+        }
+
+        /// <summary>
+        /// True when <paramref name="text"/> holds CJK the face cannot draw — the literal 口口口 case.
+        /// RMR content stays Chinese under an English UI (mod data and partial translations), and the
+        /// vanilla English face has no CJK glyphs, so those labels render as tofu boxes. Language
+        /// alone cannot detect this: the UI language is 'en' and the face is a perfectly valid en face.
+        /// Samples a few glyphs rather than scanning whole paragraphs.
+        /// </summary>
+        private static bool TextWouldTofu(TMP_FontAsset font, string text)
+        {
+            if (font == null || string.IsNullOrEmpty(text))
+                return false;
+            try
+            {
+                HashSet<TMP_FontAsset> visited = new HashSet<TMP_FontAsset>();
+                int sampled = 0;
+                foreach (char c in text)
+                {
+                    if (!IsCjkOrKana(c))
+                        continue;
+                    if (++sampled > 8)
+                        break;
+                    visited.Clear();
+                    if (!FontHasCharacterRecursive(font, c, visited))
+                        return true;
+                }
+            }
+            catch { /* never let a diagnostic break the repair pass */ }
+            return false;
+        }
+
+        /// <summary>
+        /// Highest canvas sortingOrder the prepare-screen inventory repair currently forces.
+        /// Hover previews must sit above this. It cannot be a constant: LogUIObjs canvases are built
+        /// with `sortingOrder += index` on top of the cloned vanilla LevelUpUI order, so the raise
+        /// derived from it can land anywhere -- a hardcoded 250 boost silently lost whenever the
+        /// clone base was high enough to push the inventory past it.
+        /// </summary>
+        public static int PrepareInventoryTopSortingOrder;
+
+        private static TMP_FontAsset _defFontValidatedFace;
+        private static string _defFontValidatedLang;
+
+        /// <summary>
+        /// DefFont_TMP is read on every text creation, so memoise the (face, language) verdict instead of
+        /// re-probing glyphs each time. Re-validates automatically once the language changes.
+        /// </summary>
+        private static bool IsCachedDefFontStillGood(TMP_FontAsset font, string lang)
+        {
+            if (font == null || string.IsNullOrEmpty(font.name))
+                return false;
+            if (object.ReferenceEquals(font, _defFontValidatedFace)
+                && string.Equals(lang, _defFontValidatedLang, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (!IsUsableLanguageFace(font, lang))
+                return false;
+            _defFontValidatedFace = font;
+            _defFontValidatedLang = lang;
+            return true;
+        }
+
+        /// <summary>
         /// Pick Noto CJK TMP face matching cn/kr/jp. Logs previously showed font_NotoSans = CJKkr while language=cn.
         /// </summary>
         private static TMP_FontAsset GetLanguageMatchedNotoFont(string language)
@@ -766,6 +935,8 @@ namespace abcdcode_LOGLIKE_MOD
             TMP_FontAsset fieldNoto = null;
             TMP_FontAsset bestPrimary = null;
             TMP_FontAsset bestFallbackOnly = null;
+            int bestPrimaryScore = int.MinValue;
+            int bestFallbackScore = int.MinValue;
 
             // Prefer the exact slot vanilla SetLocalizedFont uses for this language.
             try
@@ -784,9 +955,10 @@ namespace abcdcode_LOGLIKE_MOD
                     {
                         FieldInfo pf = setterEarly.GetType().GetField(preferField, AccessTools.all);
                         TMP_FontAsset slot = pf != null ? pf.GetValue(setterEarly) as TMP_FontAsset : null;
-                        if (slot != null
-                            && !IsTmpFallbackFaceName(slot.name ?? "")
-                            && IsTmpFontCompatibleWithLanguage(slot, lang))
+                        // This slot is the face the base game itself renders the language with, so a
+                        // '[Fallback_N]' label is not a reason to reject it — doing so is what pushed
+                        // Chinese resolution onto a Korean face.
+                        if (slot != null && IsUsableLanguageFace(slot, lang))
                         {
                             Debug.Log($"[RMR Localize] Using LocalizedFontSetter.{preferField}='{slot.name}'.");
                             return slot;
@@ -796,6 +968,27 @@ namespace abcdcode_LOGLIKE_MOD
             }
             catch { /* fall through to scan */ }
 
+            // Vanilla CJK UI is Sans Regular. Serif, and synthetic-looking Medium/Bold weights, smear at
+            // small SDF sizes — rank them below so a "any Noto face" scan cannot land on them.
+            int ScoreFace(string rawName)
+            {
+                string n = StripTmpFallbackPrefix(rawName);
+                int score = 0;
+                if (n.IndexOf("Sans", StringComparison.OrdinalIgnoreCase) >= 0)
+                    score += 20;
+                if (n.IndexOf("Serif", StringComparison.OrdinalIgnoreCase) >= 0)
+                    score -= 20;
+                if (n.IndexOf("Regular", StringComparison.OrdinalIgnoreCase) >= 0)
+                    score += 10;
+                if (n.IndexOf("Medium", StringComparison.OrdinalIgnoreCase) >= 0)
+                    score -= 5;
+                if (n.IndexOf("Bold", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Black", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Heavy", StringComparison.OrdinalIgnoreCase) >= 0)
+                    score -= 10;
+                return score;
+            }
+
             void Consider(TMP_FontAsset asset, string source)
             {
                 if (asset == null)
@@ -803,10 +996,14 @@ namespace abcdcode_LOGLIKE_MOD
                 string name = asset.name ?? "";
                 if (IsLowQualityTmpFont(asset))
                     return;
+                // A kr/jp face covers Han and would otherwise win the cn scan outright.
+                if (!IsFaceRegionAcceptableForLanguage(name, lang))
+                    return;
+                string stripped = StripTmpFallbackPrefix(name);
                 bool tokenHit = false;
                 foreach (string token in prefer)
                 {
-                    if (name.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (stripped.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         tokenHit = true;
                         break;
@@ -814,16 +1011,21 @@ namespace abcdcode_LOGLIKE_MOD
                 }
                 if (!tokenHit)
                     return;
+                int score = ScoreFace(name);
                 if (IsTmpFallbackFaceName(name))
                 {
-                    if (bestFallbackOnly == null)
+                    if (bestFallbackOnly == null || score > bestFallbackScore)
+                    {
                         bestFallbackOnly = asset;
+                        bestFallbackScore = score;
+                    }
                     return;
                 }
-                if (bestPrimary == null)
+                if (bestPrimary == null || score > bestPrimaryScore)
                 {
                     bestPrimary = asset;
-                    Debug.Log($"[RMR Localize] Matched primary font '{name}' via {source}.");
+                    bestPrimaryScore = score;
+                    Debug.Log($"[RMR Localize] Matched primary font '{name}' (score={score}) via {source}.");
                 }
             }
 
@@ -852,11 +1054,16 @@ namespace abcdcode_LOGLIKE_MOD
                                 foreach (string token in prefer)
                                 {
                                     if (fbName.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0
-                                        && !IsTmpFallbackFaceName(asset.name ?? ""))
+                                        && !IsTmpFallbackFaceName(asset.name ?? "")
+                                        // Without this the kr host face wins cn purely because its
+                                        // fallback table happens to contain an sc face.
+                                        && IsFaceRegionAcceptableForLanguage(asset.name ?? "", lang))
                                     {
-                                        if (bestPrimary == null)
+                                        int hostScore = ScoreFace(asset.name ?? "");
+                                        if (bestPrimary == null || hostScore > bestPrimaryScore)
                                         {
                                             bestPrimary = asset;
+                                            bestPrimaryScore = hostScore;
                                             Debug.Log($"[RMR Localize] Matched primary '{asset.name}' (fallback '{fbName}') via setter field {field.Name}.");
                                         }
                                         break;
@@ -987,9 +1194,10 @@ namespace abcdcode_LOGLIKE_MOD
                         if (!typeof(TMP_FontAsset).IsAssignableFrom(field.FieldType))
                             continue;
                         TMP_FontAsset asset = field.GetValue(setter) as TMP_FontAsset;
-                        if (asset == null || IsTmpFallbackFaceName(asset.name ?? ""))
+                        if (asset == null || !IsFaceRegionAcceptableForLanguage(asset.name ?? "", lang))
                             continue;
-                        string name = asset.name ?? "";
+                        // Match on the stripped name: the cn serif face ships as '[Fallback_N]NotoSerifCJKsc-…'.
+                        string name = StripTmpFallbackPrefix(asset.name ?? "");
                         foreach (string token in prefer)
                         {
                             if (name.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -999,9 +1207,9 @@ namespace abcdcode_LOGLIKE_MOD
                 }
                 foreach (TMP_FontAsset asset in Resources.FindObjectsOfTypeAll<TMP_FontAsset>())
                 {
-                    if (asset == null || IsTmpFallbackFaceName(asset.name ?? ""))
+                    if (asset == null || !IsFaceRegionAcceptableForLanguage(asset.name ?? "", lang))
                         continue;
-                    string name = asset.name ?? "";
+                    string name = StripTmpFallbackPrefix(asset.name ?? "");
                     foreach (string token in prefer)
                     {
                         if (name.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -1033,9 +1241,20 @@ namespace abcdcode_LOGLIKE_MOD
                 return;
 
             string prevName = previous != null ? previous.name : "null";
-            bool bad = previous == null
-                || IsTmpFallbackFaceName(prevName)
-                || !IsTmpFontCompatibleWithLanguage(previous, lang);
+
+            // Hard stop: a language slot must never receive a wrong-script face. Writing
+            // 'NotoSerifCJKkr-Medium SDF' into cnFont_notoSansCJKsc re-fonted *all* vanilla Chinese UI
+            // to a Korean Serif Medium atlas, which reads as heavy blur.
+            if (!IsFaceRegionAcceptableForLanguage(replacement.name ?? "", lang))
+            {
+                Debug.LogWarning($"[RMR Localize] Refused LocalizedFontSetter.{fieldName} ← '{replacement.name}': wrong script for lang={lang}, kept '{prevName}'.");
+                return;
+            }
+
+            // Judge the installed face by its stripped name: vanilla's cn slots legitimately hold
+            // '[Fallback_N]NotoSansCJKsc-Regular SDF', and treating that label as broken is what made
+            // the replacement fire in the first place.
+            bool bad = !IsUsableLanguageFace(previous, lang);
             if (!force && !bad)
                 return;
 
@@ -1107,8 +1326,70 @@ namespace abcdcode_LOGLIKE_MOD
             return (Sprite)null;
         }
 
+        /// <summary>
+        /// name -> full path index of ArtWork/, built once.
+        /// Without it every cache miss walked the whole ArtWork tree comparing file names; with the
+        /// full art set restored (767 files across ~50 folders) that turned each miss into a full
+        /// directory scan.
+        /// </summary>
+        private static Dictionary<string, string> _artWorkPathByName;
+
+        private static Dictionary<string, string> GetArtWorkIndex()
+        {
+            if (_artWorkPathByName != null)
+                return _artWorkPathByName;
+            var index = new Dictionary<string, string>(StringComparer.Ordinal);
+            try
+            {
+                IndexArtWorkDirectory(new DirectoryInfo(LogLikeMod.path + "/ArtWork"), index);
+                Debug.Log($"[RMR] ArtWork index built: {index.Count} entries.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR] ArtWork index build failed: " + ex.Message);
+            }
+            _artWorkPathByName = index;
+            return _artWorkPathByName;
+        }
+
+        /// <summary>Subdirectories first, then files -- same order the old recursive search used,
+        /// so a duplicated file name still resolves to the same image it always did.</summary>
+        private static void IndexArtWorkDirectory(DirectoryInfo dir, Dictionary<string, string> index)
+        {
+            if (dir == null || !dir.Exists)
+                return;
+            foreach (DirectoryInfo sub in dir.GetDirectories())
+                IndexArtWorkDirectory(sub, index);
+            foreach (System.IO.FileInfo file in dir.GetFiles())
+            {
+                string key = Path.GetFileNameWithoutExtension(file.FullName);
+                if (!index.ContainsKey(key))
+                    index[key] = file.FullName;
+            }
+        }
+
+        private static Sprite LoadSpriteFromFile(string fullPath)
+        {
+            Texture2D texture2D = new Texture2D(2, 2);
+            texture2D.LoadImage(File.ReadAllBytes(fullPath));
+            return Sprite.Create(texture2D, new Rect(0.0f, 0.0f, (float)texture2D.width, (float)texture2D.height), new Vector2(0.0f, 0.0f), 100f, 0U, SpriteMeshType.FullRect);
+        }
+
         public static Sprite GetArtWorks(string name)
         {
+            if (string.IsNullOrEmpty(name))
+                return null;
+            try
+            {
+                if (GetArtWorkIndex().TryGetValue(name, out string indexed))
+                    return LoadSpriteFromFile(indexed);
+                return null;   // indexed miss is authoritative; no point re-walking the tree
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[RMR] GetArtWorks('{name}') failed: " + ex.Message);
+            }
+
             DirectoryInfo directoryInfo = new DirectoryInfo(LogLikeMod.path + "/ArtWork");
             if (directoryInfo.GetDirectories().Length != 0)
             {
@@ -2155,6 +2436,13 @@ namespace abcdcode_LOGLIKE_MOD
         /// <summary>Public language resolve for shop/open paths (option.dat → TextDataModel → OS).</summary>
         public static string GetActiveTextLanguage() => ResolveInitialTextLanguage();
 
+        /// <summary>
+        /// Public canonical form ("cn"/"en"/"kr"/"jp"). Callers that compare two language strings
+        /// MUST normalise both sides through this: vanilla hands out several spellings for the same
+        /// language and a raw string compare silently reports "unchanged" across a real switch.
+        /// </summary>
+        public static string CanonicalizeLanguageTag(string language) => CanonicalizeTextLanguage(language);
+
         private static string ResolveInitialTextLanguage()
         {
             string optionLanguage = TryReadLanguageFromOptionFile();
@@ -2390,6 +2678,17 @@ namespace abcdcode_LOGLIKE_MOD
             // Never treat a bare TMP Fallback table face as "compatible primary" —
             // it may pass HasCharacter on a partial atlas yet still tofu in UI.
             if (IsTmpFallbackFaceName(font.name ?? ""))
+                return false;
+            // Han coverage is shared across the whole Noto CJK family, so probes cannot tell sc from kr.
+            if (!IsFaceRegionAcceptableForLanguage(font.name ?? "", language))
+                return false;
+            return FontCoversLanguageProbes(font, language);
+        }
+
+        /// <summary>Glyph-coverage half of the compatibility test (walks the fallback chain).</summary>
+        private static bool FontCoversLanguageProbes(TMP_FontAsset font, string language)
+        {
+            if (font == null)
                 return false;
             string probes = GetFontProbeCharacters(language);
             if (string.IsNullOrEmpty(probes))
@@ -3042,6 +3341,62 @@ namespace abcdcode_LOGLIKE_MOD
             return false;
         }
 
+        /// <summary>
+        /// Report which script the vanilla abnormality table currently holds, so a language mismatch
+        /// is visible in Player.log instead of only on screen. Returns e.g.
+        /// "sample id=bloodbath cjk=0 hangul=0 latin=42 expect=en MISMATCH".
+        /// </summary>
+        public static string SampleAbnormalityTextScript(string language)
+        {
+            try
+            {
+                AbnormalityCardDescXmlList list = Singleton<AbnormalityCardDescXmlList>.Instance;
+                if (list == null)
+                    return "sample=<no AbnormalityCardDescXmlList>";
+                var dict = typeof(AbnormalityCardDescXmlList)
+                    .GetField("_dictionary", AccessTools.all)?.GetValue(list)
+                    as System.Collections.IDictionary;
+                if (dict == null || dict.Count == 0)
+                    return "sample=<empty table>";
+
+                string sampleId = null, text = null;
+                foreach (System.Collections.DictionaryEntry entry in dict)
+                {
+                    AbnormalityCard card = entry.Value as AbnormalityCard;
+                    if (card == null)
+                        continue;
+                    string candidate = card.abilityDesc;
+                    if (string.IsNullOrEmpty(candidate))
+                        candidate = card.cardName;
+                    if (string.IsNullOrEmpty(candidate) || candidate == "Not found")
+                        continue;
+                    sampleId = entry.Key as string;
+                    text = candidate;
+                    break;
+                }
+                if (text == null)
+                    return "sample=<no usable entry>";
+
+                int cjk = 0, hangul = 0, latin = 0;
+                foreach (char c in text)
+                {
+                    if (c >= '一' && c <= '鿿') cjk++;
+                    else if (c >= '가' && c <= '힯') hangul++;
+                    else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) latin++;
+                }
+                string lang = CanonicalizeTextLanguage(language);
+                bool ok = lang == "cn" || lang == "trcn" ? cjk > 0
+                        : lang == "kr" ? hangul > 0
+                        : lang == "jp" ? (cjk > 0 || hangul == 0)
+                        : latin > 0 && cjk == 0 && hangul == 0;   // en
+                return $"sample id={sampleId} cjk={cjk} hangul={hangul} latin={latin} expect={lang} {(ok ? "OK" : "MISMATCH")}";
+            }
+            catch (Exception ex)
+            {
+                return "sample=<failed: " + ex.Message + ">";
+            }
+        }
+
         public static void RefreshVanillaAbnormalityTextData(string language, string reason)
         {
             if (RefreshingVanillaAbnormalityTextData)
@@ -3058,7 +3413,11 @@ namespace abcdcode_LOGLIKE_MOD
                 }
                 loader.LoadAbnormalityCardDescriptions(language);
                 loader.LoadAbnormalityAbilityDescription(language);
-                Debug.Log($"[RMR Localize] Refreshed vanilla abnormality text for language={language}, reason={reason}.");
+                // Health check, same idea as ReloadVanillaBossBirdTextForLanguage: sample what
+                // actually landed in the table. Players report English UI showing Chinese text and
+                // Chinese UI showing English -- an exact inversion -- and without this there is no
+                // way to tell whether the reload itself is wrong or something overwrites it later.
+                Debug.Log($"[RMR Localize] Refreshed vanilla abnormality text for language={language}, reason={reason}. {SampleAbnormalityTextScript(language)}");
             }
             catch (Exception e)
             {
@@ -3406,6 +3765,42 @@ namespace abcdcode_LOGLIKE_MOD
 
         #region --- Harmony / hooks / utils ---
 
+
+        /// <summary>
+        /// Enumerate an assembly's types without letting a third-party mod abort the caller.
+        /// <see cref="GetAssemList"/> returns every loaded mod assembly, so a single DLL that
+        /// references an unresolvable type makes <c>Assembly.GetTypes()</c> throw
+        /// ReflectionTypeLoadException. On the save-load path that aborted deserialization halfway
+        /// and wiped the run inventory — reproducible for players with extra mods, invisible to us.
+        /// ReflectionTypeLoadException still carries the types it did resolve, so keep those.
+        /// </summary>
+        public static IEnumerable<System.Type> GetLoadableTypes(Assembly assembly)
+        {
+            if (assembly == null)
+                return new System.Type[0];
+            try
+            {
+                return assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                System.Type[] partial = ex.Types == null
+                    ? new System.Type[0]
+                    : ex.Types.Where(t => t != null).ToArray();
+                Debug.LogWarning($"[RMR] GetLoadableTypes: '{SafeAssemblyName(assembly)}' failed to load all types; continuing with {partial.Length}.");
+                return partial;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[RMR] GetLoadableTypes: skipping '{SafeAssemblyName(assembly)}': {ex.Message}");
+                return new System.Type[0];
+            }
+        }
+
+        private static string SafeAssemblyName(Assembly assembly)
+        {
+            try { return assembly.FullName; } catch { return "<unnamed>"; }
+        }
 
         public static List<Assembly> GetAssemList()
         {
@@ -4571,7 +4966,7 @@ namespace abcdcode_LOGLIKE_MOD
                 return Activator.CreateInstance(LogLikeMod.FindPickUpCache[script]) as PickUpModelBase;
             foreach (Assembly assem in LogLikeMod.GetAssemList())
             {
-                foreach (System.Type type in assem.GetTypes())
+                foreach (System.Type type in LogLikeMod.GetLoadableTypes(assem))
                 {
                     if (type.Name == "PickUpModel_" + script.Trim())
                     {
@@ -4695,23 +5090,51 @@ namespace abcdcode_LOGLIKE_MOD
                 this.Log("End PreLoad AssetBundle : " + now.ToString());
             }
 
+            /// <summary>Milliseconds of decoding allowed per frame during art preload.</summary>
+            private const double ArtWorkPreloadBudgetMs = 8.0;
+
             public IEnumerator ArtWorkPreLoading()
             {
+                // Two bugs used to compound here:
+                //  1) entries were cached under nam.Key (the FULL PATH) while every consumer looks
+                //     up by file name, so the whole preload was dead weight and each real lookup
+                //     still paid a full recursive directory walk;
+                //  2) exactly one texture was decoded per frame, so with the complete art set
+                //     restored (767 files) the loading screen sat for ~15 seconds.
+                // Cache by name, and decode on a time budget instead of one-per-frame.
+                var frameClock = new System.Diagnostics.Stopwatch();
+                frameClock.Start();
+                int loaded = 0, failed = 0;
                 while (this.NameAndPathDic.Count > 0)
                 {
                     KeyValuePair<string, string> nam = this.NameAndPathDic.Pop();
-                    Texture2D texture2D = new Texture2D(2, 2);
-                    byte[] bytes = File.ReadAllBytes(nam.Key);
-                    texture2D.LoadImage(bytes);
-                    Sprite value = Sprite.Create(texture2D, new Rect(0.0f, 0.0f, (float)texture2D.width, (float)texture2D.height), new Vector2(0.0f, 0.0f), 100f, 0U, SpriteMeshType.FullRect);
-                    LogLikeMod.ArtWorks.dic[nam.Key] = value;
-                    yield return new WaitForEndOfFrame();
-                    nam = new KeyValuePair<string, string>();
-                    texture2D = (Texture2D)null;
-                    bytes = (byte[])null;
-                    value = (Sprite)null;
+                    string fullPath = nam.Key;
+                    string artName = nam.Value;
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(artName) && !LogLikeMod.ArtWorks.dic.ContainsKey(artName))
+                        {
+                            Texture2D texture2D = new Texture2D(2, 2);
+                            texture2D.LoadImage(File.ReadAllBytes(fullPath));
+                            LogLikeMod.ArtWorks.dic[artName] = Sprite.Create(
+                                texture2D,
+                                new Rect(0.0f, 0.0f, (float)texture2D.width, (float)texture2D.height),
+                                new Vector2(0.0f, 0.0f), 100f, 0U, SpriteMeshType.FullRect);
+                            loaded++;
+                        }
+                    }
+                    catch
+                    {
+                        failed++;   // a single unreadable png must not abort the whole preload
+                    }
+                    if (frameClock.Elapsed.TotalMilliseconds >= ArtWorkPreloadBudgetMs)
+                    {
+                        yield return new WaitForEndOfFrame();
+                        frameClock.Reset();
+                        frameClock.Start();
+                    }
                 }
-                this.Log("End PreLoad ArtWork : " + DateTime.Now.ToString());
+                this.Log($"End PreLoad ArtWork : {DateTime.Now} (loaded={loaded}, failed={failed})");
             }
         }
 
@@ -4767,7 +5190,7 @@ namespace abcdcode_LOGLIKE_MOD
 
             public static void LoadTypesFromAssembly(Assembly assembly)
             {
-                foreach (System.Type type in assembly.GetTypes())
+                foreach (System.Type type in LogLikeMod.GetLoadableTypes(assembly))
                 {
                     string name = type.Name;
                     if (type.IsSubclassOf(typeof(DiceCardSelfAbilityBase)) && name.StartsWith("DiceCardSelfAbility_"))
@@ -4866,7 +5289,7 @@ namespace abcdcode_LOGLIKE_MOD
                         {
                             if (!assemblyList.Contains(assembly))
                             {
-                                foreach (System.Type type in assembly.GetTypes())
+                                foreach (System.Type type in LogLikeMod.GetLoadableTypes(assembly))
                                 {
                                     string key = type.Name;
                                     bool flag = false;
@@ -6117,7 +6540,8 @@ namespace abcdcode_LOGLIKE_MOD
                 catch { /* ignore */ }
 
                 TMP_FontAsset font = LogLikeMod.DefFont_TMP;
-                if (font != null && IsTmpFallbackFaceName(font.name ?? ""))
+                // A '[Fallback_N]' label alone is not a defect — the cn primary legitimately carries one.
+                if (font != null && !IsUsableLanguageFace(font, GetActiveTextLanguage()))
                 {
                     LogLikeMod.InvalidateTmpFontCache();
                     font = LogLikeMod.DefFont_TMP;
@@ -6167,8 +6591,7 @@ namespace abcdcode_LOGLIKE_MOD
                         {
                             if (any == null || any.font == font)
                                 continue;
-                            if (IsTmpFallbackFaceName(any.font != null ? any.font.name : "")
-                                || !IsTmpFontCompatibleWithLanguage(any.font, GetActiveTextLanguage()))
+                            if (!IsUsableLanguageFace(any.font, GetActiveTextLanguage()))
                                 Apply(any);
                         }
                     }

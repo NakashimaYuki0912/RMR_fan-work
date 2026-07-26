@@ -100,7 +100,68 @@ namespace abcdcode_LOGLIKE_MOD
         /// </summary>
         public static void RemovePlayerData()
         {
+            // A fresh run is starting, so there is no longer a good snapshot to protect.
+            LastLoadFailed = false;
             Singleton<LogueSaveManager>.Instance.RemoveData("Lastest");
+        }
+
+        /// <summary>
+        /// Snapshot writes must never persist a run state that was never fully built. A partial
+        /// load leaves cardlist/booklist empty; before this guard the next autosave wrote that
+        /// emptiness over the good file, turning one load error into permanent corruption.
+        /// </summary>
+        private static bool ShouldRefuseSnapshotWrite(string reason)
+        {
+            if (LastLoadFailed)
+            {
+                Debug.LogError($"[RMR Save] Refusing to write Lastest ({reason}): the last LoadPlayData failed, so the in-memory run is incomplete. The existing save file is left untouched.");
+                return true;
+            }
+            if (LogLikeMod.saveloading)
+            {
+                Debug.LogWarning($"[RMR Save] Skipping Lastest write ({reason}): a load is still in progress.");
+                return true;
+            }
+            WarnIfInventoryLooksWiped(reason);
+            return false;
+        }
+
+        /// <summary>
+        /// Diagnostic only — never blocks the write. A genuinely fresh run can legitimately have an
+        /// empty inventory, so this must not become a refusal; it only leaves a breadcrumb in
+        /// Player.log if the wipe pattern ever shows up again through some other path.
+        /// </summary>
+        private static void WarnIfInventoryLooksWiped(string reason)
+        {
+            try
+            {
+                bool memoryEmpty = (LogueBookModels.cardlist == null || LogueBookModels.cardlist.Count == 0)
+                    && (LogueBookModels.booklist == null || LogueBookModels.booklist.Count == 0);
+                if (!memoryEmpty)
+                    return;
+                SaveData existing = Singleton<LogueSaveManager>.Instance.LoadData("Lastest");
+                SaveData book = existing != null ? existing.GetData("LogueBookModel") : null;
+                if (book == null)
+                    return;
+                int onDisk = CountEntries(book.GetData("cardlist")) + CountEntries(book.GetData("booklist"));
+                if (onDisk > 0)
+                    Debug.LogWarning($"[RMR Save] Writing an empty inventory over a Lastest that holds {onDisk} entries ({reason}). If this was not a fresh run, the previous load failed silently.");
+            }
+            catch { /* diagnostics must never break saving */ }
+        }
+
+        private static int CountEntries(SaveData list)
+        {
+            if (list == null)
+                return 0;
+            int count = 0;
+            try
+            {
+                foreach (SaveData _ in list)
+                    count++;
+            }
+            catch { return 0; }
+            return count;
         }
 
         /// <summary>
@@ -109,6 +170,8 @@ namespace abcdcode_LOGLIKE_MOD
         /// </summary>
         public static void SavePlayData()
         {
+            if (ShouldRefuseSnapshotWrite("SavePlayData"))
+                return;
             SaveData data1 = new SaveData();
             data1.AddData("version", new SaveData(LoguePlayDataSaver.version));
             data1.AddData("LogueBookModel", LogueBookModels.GetSaveData());
@@ -129,6 +192,8 @@ namespace abcdcode_LOGLIKE_MOD
         /// </summary>
         public static void SavePlayData_Menu()
         {
+            if (ShouldRefuseSnapshotWrite("SavePlayData_Menu"))
+                return;
             SaveData saveData = Singleton<LogueSaveManager>.Instance.LoadData("Lastest");
             // No continue file yet (or version mismatch): write a full snapshot so shop/mystery
             // still create a resumable run (ClearBattle used to wipe Lastest after every act).
@@ -165,17 +230,45 @@ namespace abcdcode_LOGLIKE_MOD
 
         #region --- Load into live run state ---
 
+        /// <summary>
+        /// True when the most recent <see cref="LoadPlayData(SaveData)"/> threw, i.e. the live run
+        /// state is only partly deserialized. Snapshot writes are refused while this is set.
+        /// </summary>
+        public static bool LastLoadFailed { get; private set; }
+
         /// <summary>Apply a SaveData blob into LogueBookModels + LogLikeMod + global effects.</summary>
         public static void LoadPlayData(SaveData data)
         {
+            // cardlist / booklist are the LAST two things LogueBookModels.LoadFromSaveData reads,
+            // and CreatePlayer() has already reset them to empty by then. So anything that throws
+            // in between leaves the librarians intact but the inventory empty — exactly the
+            // "Keypages and Combat Pages are all removed" report.
+            //
+            // Without the finally, saveloading also stayed true forever, which makes CheckStage()
+            // permanently true and hands the prep-screen inventory UI those empty lists; the next
+            // autosave then wrote the emptiness to disk and the run was unrecoverable.
             LogLikeMod.saveloading = true;
-            LogueBookModels.LoadFromSaveData(data.GetData("LogueBookModel"));
-            LogLikeMod.LoadFromSaveData(data.GetData("LogLikeMod"));
-            if (LogLikeMod.curchaptergrade >= ChapterGrade.Grade6)
-                RMRCore.EnsureGrade6SpecialCorePagesUnlocked();
-            RMRCore.ApplyBinahRedMistProgressionState();
-            Singleton<GlobalLogueEffectManager>.Instance.LoadFromSaveData(data.GetData("GlobalEffect"));
-            LogLikeMod.saveloading = false;
+            LastLoadFailed = false;
+            try
+            {
+                LogueBookModels.LoadFromSaveData(data.GetData("LogueBookModel"));
+                LogLikeMod.LoadFromSaveData(data.GetData("LogLikeMod"));
+                if (LogLikeMod.curchaptergrade >= ChapterGrade.Grade6)
+                    RMRCore.EnsureGrade6SpecialCorePagesUnlocked();
+                RMRCore.ApplyBinahRedMistProgressionState();
+                Singleton<GlobalLogueEffectManager>.Instance.LoadFromSaveData(data.GetData("GlobalEffect"));
+            }
+            catch (Exception)
+            {
+                // Latch before rethrowing so the snapshot guard below can refuse to persist the
+                // half-built state. Callers keep their existing failure handling.
+                LastLoadFailed = true;
+                throw;
+            }
+            finally
+            {
+                LogLikeMod.saveloading = false;
+            }
         }
 
         /// <summary>Load the on-disk <c>Lastest</c> continue snapshot.</summary>

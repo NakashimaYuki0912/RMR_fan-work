@@ -40,6 +40,18 @@ namespace RogueLike_Mod_Reborn
         /// </summary>
         private const int DetailSortBoost = 250;
 
+        /// <summary>
+        /// Hover layers must clear whatever RepairPrepareInventoryDrawOrder raised the inventory to.
+        /// That value derives from a cloned vanilla LevelUpUI canvas (`sortingOrder += index`), so it
+        /// is not knowable at compile time -- when the clone base was high the inventory landed above
+        /// the fixed 250 and the hover preview was drawn underneath the key-page list.
+        /// </summary>
+        internal static int ResolveHoverSortOrder(int floor)
+        {
+            int inventoryTop = abcdcode_LOGLIKE_MOD.LogLikeMod.PrepareInventoryTopSortingOrder;
+            return inventoryTop > 0 ? Math.Max(floor, inventoryTop + 10) : floor;
+        }
+
         private static UIDetailCardSlot _activeDetail;
         private static Canvas _detailCanvas;
         private static bool _addedCanvas;
@@ -102,8 +114,9 @@ namespace RogueLike_Mod_Reborn
                 c.enabled = true;
                 c.overrideSorting = true;
                 // Absolute order high enough to sit above list graphics in the same edit panel.
-                if (c.sortingOrder < DetailSortBoost)
-                    c.sortingOrder = DetailSortBoost;
+                int detailOrder = ResolveHoverSortOrder(DetailSortBoost);
+                if (c.sortingOrder < detailOrder)
+                    c.sortingOrder = detailOrder;
 
                 if (detail.GetComponent<GraphicRaycaster>() == null)
                 {
@@ -288,8 +301,9 @@ namespace RogueLike_Mod_Reborn
                 _previewCanvas = c;
                 c.enabled = true;
                 c.overrideSorting = true;
-                if (c.sortingOrder < PreviewSortBoost)
-                    c.sortingOrder = PreviewSortBoost;
+                int previewOrder = RMRCombatCardDetailLayer.ResolveHoverSortOrder(PreviewSortBoost);
+                if (c.sortingOrder < previewOrder)
+                    c.sortingOrder = previewOrder;
 
                 if (preview.GetComponent<GraphicRaycaster>() == null)
                 {

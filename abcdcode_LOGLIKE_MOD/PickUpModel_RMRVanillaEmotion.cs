@@ -412,7 +412,7 @@ namespace abcdcode_LOGLIKE_MOD
                 .Distinct();
             foreach (Assembly assembly in assemblies)
             {
-                foreach (Type type in assembly.GetTypes())
+                foreach (Type type in LogLikeMod.GetLoadableTypes(assembly))
                 {
                     if (string.Equals(type.Name, typeName, StringComparison.OrdinalIgnoreCase)
                         && typeof(EmotionCardAbilityBase).IsAssignableFrom(type))

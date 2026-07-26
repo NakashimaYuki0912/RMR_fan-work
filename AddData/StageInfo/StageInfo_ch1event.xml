@@ -107,4 +107,98 @@
       <Unit>28480006</Unit>
     </Wave>
   </Stage>
+
+  <!--
+    Placeholder stages referenced by SpecialStaticInfo/StagesXmlInfos/Stage_ch3..ch7.xml.
+    Deleted by mistake in e998173 (2026-07-02); the node maps kept referencing them, so every
+    run logged "INVALID STAGE REMOVED FROM STAGE LIST ON INITIALIZE" and dropped the nodes.
+
+    991103-991107: Creature nodes. The wave content here is irrelevant — RMRAbnormalityBattleRouter
+    swaps in a vanilla abnormality stage per chapter. Only a parseable <Wave> is required.
+    991001-991003: abnormality mystery nodes (BlackForestMysteryId / WellMysteryId /
+    HandsOfLightMysteryId in RMR_AbnormalityUnlocks.cs).
+
+    991101 / 991102 are intentionally not restored — nothing references them.
+  -->
+
+  <Stage id="991103">
+    <Wave>
+      <AvailableUnit>5</AvailableUnit>
+      <Formation>3</Formation>
+      <Unit>21004</Unit>
+      <Unit>21004</Unit>
+      <Unit>21004</Unit>
+    </Wave>
+  </Stage>
+
+  <Stage id="991104">
+    <Wave>
+      <AvailableUnit>5</AvailableUnit>
+      <Formation>3</Formation>
+      <Unit>30001</Unit>
+      <Unit>30002</Unit>
+      <Unit>30003</Unit>
+    </Wave>
+  </Stage>
+
+  <Stage id="991105">
+    <Wave>
+      <AvailableUnit>5</AvailableUnit>
+      <Formation>10</Formation>
+      <Unit>41001</Unit>
+      <Unit>41001</Unit>
+      <Unit>41001</Unit>
+      <Unit>41001</Unit>
+      <Unit>41001</Unit>
+    </Wave>
+  </Stage>
+
+  <Stage id="991106">
+    <Wave>
+      <Formation>21</Formation>
+      <AvailableUnit>5</AvailableUnit>
+      <Unit>50001</Unit>
+      <Unit>50001</Unit>
+      <Unit>50001</Unit>
+      <Unit>50001</Unit>
+      <Unit>50001</Unit>
+    </Wave>
+  </Stage>
+
+  <!-- Impurity Creature placeholder (routed through RMRAbnormalityBattleRouter) -->
+  <Stage id="991107">
+    <Wave>
+      <Formation>21</Formation>
+      <AvailableUnit>5</AvailableUnit>
+      <Unit>50001</Unit>
+      <Unit>50001</Unit>
+      <Unit>50001</Unit>
+      <Unit>50001</Unit>
+      <Unit>50001</Unit>
+    </Wave>
+  </Stage>
+
+  <Stage id="991001">
+    <Wave>
+      <AvailableUnit>5</AvailableUnit>
+      <Formation>2</Formation>
+      <Unit>28470001</Unit>
+    </Wave>
+  </Stage>
+
+  <Stage id="991002">
+    <Wave>
+      <AvailableUnit>5</AvailableUnit>
+      <Formation>2</Formation>
+      <Unit>28470001</Unit>
+    </Wave>
+  </Stage>
+
+  <Stage id="991003">
+    <Wave>
+      <AvailableUnit>5</AvailableUnit>
+      <Formation>2</Formation>
+      <Unit>28470001</Unit>
+    </Wave>
+  </Stage>
 </StageXmlRoot>

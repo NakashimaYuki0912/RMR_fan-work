@@ -80,7 +80,7 @@ namespace RogueLike_Mod_Reborn
         private static bool BlackSilenceClearRecordedThisBattle;
         private static bool BlueReverberationRewardsGrantedThisBattle;
 
-        // Floor 鈫?all abnormality script roots on that floor
+        // Floor -> all abnormality script roots on that floor
         // Sourced from vanilla EmotionCard_*.txt <Sephirah> tags
         public static readonly Dictionary<SephirahType, string[]> FloorAbnormalityScripts = new Dictionary<SephirahType, string[]>
         {
@@ -251,7 +251,7 @@ namespace RogueLike_Mod_Reborn
             LoadRealizationProgress();
             if (data == null)
             {
-                // Empty route unlocks 鈥?permanent tiers still gate shop rolls only.
+                // Empty route unlocks -- permanent tiers still gate shop rolls only.
                 return;
             }
             SaveData pages = data.GetData("Pages");
@@ -305,9 +305,12 @@ namespace RogueLike_Mod_Reborn
 
         /// <summary>
         /// Vanilla mapping (EmotionCard Xml &lt;EmotionLevel&gt; = page tier I/II/III):
-        ///   Tier I  (EmotionLevel=1) 鈫?Team emotion 1鈥?
-        ///   Tier II (EmotionLevel=2) 鈫?Team emotion 3鈥?
-        ///   Tier III(EmotionLevel=3) 鈫?Team emotion 5
+        ///   Tier I   (EmotionLevel=1) -> team emotion 1-2
+        ///   Tier II  (EmotionLevel=2) -> team emotion 3-4
+        ///   Tier III (EmotionLevel=3) -> team emotion 5
+        /// The digit in a script name is a page index, NOT the tier: butterfly2 is tier I
+        /// while butterfly3 is tier III, and singingMachine (page 1) is tier III while
+        /// singingMachine2 is tier I. Read the tier from EmotionLevel, never from the suffix.
         /// </summary>
         public static int GetRequiredAbnoTierForTeamEmotion(int teamEmotionLevel)
         {
@@ -700,7 +703,7 @@ namespace RogueLike_Mod_Reborn
 
         public static void EnqueueBattleClearRewards()
         {
-            // Realization battles have their own reward path 鈥?skip normal Roguelike reward chains
+            // Realization battles have their own reward path -- skip normal Roguelike reward chains
             if (RMRRealizationManager.InRealizationBattle)
                 return;
 
@@ -969,7 +972,7 @@ namespace RogueLike_Mod_Reborn
 
         /// <summary>
         /// True if this run already owns the E.G.O. (picked earlier or already in inventory).
-        /// Atlas unlock alone is NOT ownership 鈥?that only opens the reward/shop pool.
+        /// Atlas unlock alone is NOT ownership -- that only opens the reward/shop pool.
         /// </summary>
         #endregion
 
@@ -1012,7 +1015,7 @@ namespace RogueLike_Mod_Reborn
                 SephirahType floor = ResolveRealizationFloor(info);
                 if (floor == SephirahType.None || !floors.Contains(floor))
                     continue;
-                // Route ownership only 鈥?atlas unlock is pool eligibility, not run ownership.
+                // Route ownership only -- atlas unlock is pool eligibility, not run ownership.
                 if (RouteUnlockedPages.Exists(id => id == info.id))
                     continue;
                 if (LogueBookModels.EmotionCardList != null && LogueBookModels.EmotionCardList.Any(x => x != null && x.id == info.id))
@@ -1050,7 +1053,7 @@ namespace RogueLike_Mod_Reborn
                         continue;
                     if (IsEgoOwnedOnCurrentRoute(id))
                         continue;
-                    // Must resolve a real card XML 鈥?otherwise GetQueuedEgoRewards drops the entry and the whole 3-pick can vanish.
+                    // Must resolve a real card XML -- otherwise GetQueuedEgoRewards drops the entry and the whole 3-pick can vanish.
                     DiceCardXmlInfo card = ItemXmlDataList.instance.GetCardItem(id, true)
                         ?? ItemXmlDataList.instance.GetCardItem(id.id, true)
                         ?? ItemXmlDataList.instance.GetCardItem(new LorId(string.Empty, id.id), true);
@@ -1989,9 +1992,9 @@ namespace RogueLike_Mod_Reborn
 
         /// <summary>
         /// Returns the set of floors whose pages are available for the given chapter grade.
-        /// Grade 1-3 鈫?Malkuth/Yesod/Hod/Netzach (鍓?灞?
-        /// Grade 4-5 鈫?Tiphereth/Gebura/Chesed (涓?灞?
-        /// Grade 6-7 鈫?Binah/Hokma/Keter (鍚?灞?
+        /// Grade 1-3 -> Malkuth/Yesod/Hod/Netzach (early floors)
+        /// Grade 4-5 -> Tiphereth/Gebura/Chesed (mid floors)
+        /// Grade 6-7 -> Binah/Hokma/Keter (late floors)
         /// </summary>
         public static HashSet<SephirahType> GetFloorsForChapter(ChapterGrade grade)
         {

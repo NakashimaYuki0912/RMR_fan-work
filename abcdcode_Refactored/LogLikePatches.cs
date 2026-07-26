@@ -1503,6 +1503,12 @@ namespace abcdcode_LOGLIKE_MOD
           bool isEgo = false)
         {
             orig(self, selectedCount, isEgo);
+            // Vanilla just filled the reward slots. Their names come from mod data that may still be
+            // Chinese while the UI language is English, and the English face has no CJK glyphs, so
+            // they draw as 口口口. Repair here, right after the slots exist and before the player
+            // sees them -- the scene-wide pass is throttled and can miss this screen entirely.
+            try { LogLikeMod.EnsureLocalizedFonts("LevelUpUI.InitBase", repairActiveUi: true); }
+            catch { /* never block the reward UI */ }
             if (LogLikeMod.CheckStage(true))
             {
                 TextMeshProUGUI textMeshProUgui1 = (TextMeshProUGUI)typeof(LevelUpUI).GetField("txt_SelectDesc", AccessTools.all).GetValue(self);
@@ -3135,6 +3141,13 @@ namespace abcdcode_LOGLIKE_MOD
             {
                 try { RMREquipPagePreviewLayer.Restore(); } catch { /* ignore */ }
             }
+            // Any tab change first puts every forced canvas back; the call below re-applies only
+            // what the new tab needs. Previously the equip raise and the HUD clamp both survived
+            // the tab change and then the rest of the run.
+            try { RestoreForcedCanvasOrders(); } catch { /* ignore */ }
+            // Remember the tab so the popup handlers can re-apply after a vanilla popup closes.
+            _lastPrepareEditPanel = __instance;
+            _lastPrepareTab = state;
             if (state != UIBattleSettingEditTap.EquipPage && state != UIBattleSettingEditTap.BattleCard)
                 return;
             try
@@ -3235,6 +3248,8 @@ namespace abcdcode_LOGLIKE_MOD
 
             int hudOrder = GetRmrHudCanvasSortingOrder();
             int inventoryOrder = Math.Max(hudOrder + 20, 140);
+            // Publish the top order so hover previews can boost above it instead of guessing 250.
+            LogLikeMod.PrepareInventoryTopSortingOrder = inventoryOrder + 1;
 
             if (state == UIBattleSettingEditTap.EquipPage && equipPanel != null)
             {
@@ -3330,6 +3345,11 @@ namespace abcdcode_LOGLIKE_MOD
                 {
                     // Keep slightly above vanilla edit panel (12) so money still shows, but
                     // well below detailSlot boost (250).
+                    // Snapshot first: LogUIObjs[100] is cached for the whole run, so leaving it
+                    // clamped here is what buried the post-battle reward Skip button (its panel
+                    // lives on LogUIObjs[100], under the full-screen mask on LogUIObjs[90]) and
+                    // made the Pierre meat-pie quest impossible to finish.
+                    RememberCanvasOrder(hudCanvas);
                     hudCanvas.overrideSorting = true;
                     hudCanvas.sortingOrder = lowerSortingIfAbove;
                 }
@@ -3363,6 +3383,63 @@ namespace abcdcode_LOGLIKE_MOD
             catch { /* optional */ }
         }
 
+        /// <summary>Pre-change state of a Canvas whose sorting RMR forced, so it can be put back.</summary>
+        private sealed class CanvasSortingSnapshot
+        {
+            public Canvas Canvas;
+            public bool Enabled;
+            public bool OverrideSorting;
+            public int SortingOrder;
+        }
+
+        /// <summary>
+        /// Every canvas whose sorting the prepare screen currently forces.
+        /// Both reported softlocks were one-way writes with no entry here: raising the key-page tab
+        /// to 141 buried UIPassiveSuccessionPopup, and clamping the RMR HUD clone to 50 buried the
+        /// reward screen's Skip button (LogUIObjs is cached for the whole run, so it never healed).
+        /// Anything this file forces must be restorable.
+        /// </summary>
+        private static readonly List<CanvasSortingSnapshot> _forcedCanvasOrders = new List<CanvasSortingSnapshot>();
+
+        private static void RememberCanvasOrder(Canvas canvas)
+        {
+            if (canvas == null)
+                return;
+            foreach (CanvasSortingSnapshot known in _forcedCanvasOrders)
+            {
+                // Keep the first snapshot: it holds the genuine pre-RMR values.
+                if (ReferenceEquals(known.Canvas, canvas))
+                    return;
+            }
+            _forcedCanvasOrders.Add(new CanvasSortingSnapshot
+            {
+                Canvas = canvas,
+                Enabled = canvas.enabled,
+                OverrideSorting = canvas.overrideSorting,
+                SortingOrder = canvas.sortingOrder
+            });
+        }
+
+        /// <summary>Put every forced canvas back exactly as it was. Safe to call repeatedly.</summary>
+        private static void RestoreForcedCanvasOrders()
+        {
+            for (int i = _forcedCanvasOrders.Count - 1; i >= 0; i--)
+            {
+                CanvasSortingSnapshot snapshot = _forcedCanvasOrders[i];
+                try
+                {
+                    if (snapshot.Canvas != null)
+                    {
+                        snapshot.Canvas.enabled = snapshot.Enabled;
+                        snapshot.Canvas.overrideSorting = snapshot.OverrideSorting;
+                        snapshot.Canvas.sortingOrder = snapshot.SortingOrder;
+                    }
+                }
+                catch { /* destroyed canvas — nothing to restore */ }
+            }
+            _forcedCanvasOrders.Clear();
+        }
+
         /// <summary>
         /// Ensure a panel has an override-sorted Canvas high enough to draw above RMR HUD clones.
         /// </summary>
@@ -3370,15 +3447,17 @@ namespace abcdcode_LOGLIKE_MOD
         {
             if (panelRoot == null)
                 return;
+            // Never fall back to GetComponentInParent. That reached the vanilla
+            // UIBattleSettingEditPanel canvas (order 12) and pinned the entire key-page tab layer at
+            // 141, which then painted over UIPassiveSuccessionPopup and its confirm dialogs.
             Canvas canvas = panelRoot.GetComponent<Canvas>();
-            if (canvas == null)
-                canvas = panelRoot.GetComponentInParent<Canvas>();
             if (canvas == null)
             {
                 canvas = panelRoot.AddComponent<Canvas>();
                 if (panelRoot.GetComponent<GraphicRaycaster>() == null)
                     panelRoot.AddComponent<GraphicRaycaster>();
             }
+            RememberCanvasOrder(canvas);
             canvas.enabled = true;
             canvas.overrideSorting = true;
             if (canvas.sortingOrder < sortingOrder)
@@ -3448,8 +3527,29 @@ namespace abcdcode_LOGLIKE_MOD
                 return false;
             }
 
-            return !LogLikeRoutines.IsRoguelikeBattleSettingContext() || !UIPassiveSuccessionPopup.Instance.isActiveAndEnabled;
+            // Was a bare "return false" while the popup was open, which left no way out once the
+            // key-page tab painted over its buttons. Close it instead of just swallowing the input.
+            // (Also guards Instance: the old expression dereferenced it unconditionally.)
+            try
+            {
+                if (LogLikeRoutines.IsRoguelikeBattleSettingContext()
+                    && UIPassiveSuccessionPopup.Instance != null
+                    && UIPassiveSuccessionPopup.Instance.isActiveAndEnabled)
+                {
+                    UIPassiveSuccessionPopup.Instance.CloseDefault();
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR UI] passive-succession back handling failed: " + ex.Message);
+            }
+            return true;
         }
+
+        /// <summary>Last prepare tab RMR applied draw-order fixes for, so they can be re-applied.</summary>
+        private static UIBattleSettingEditPanel _lastPrepareEditPanel;
+        private static UIBattleSettingEditTap _lastPrepareTab;
 
         [HarmonyPostfix, HarmonyPatch(typeof(UIPassiveSuccessionPopup), nameof(UIPassiveSuccessionPopup.Open))]
         public static void UIPassiveSuccessionPopup_Open()
@@ -3457,6 +3557,10 @@ namespace abcdcode_LOGLIKE_MOD
             if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return;
             LogLikeRoutines.SetBattleSettingCardPanelVisible(false);
+            // The key-page tab was only ever hidden for the combat-card panel, so on the key-page
+            // tab the raised inventory canvas painted straight over this popup — and with ESC and
+            // the back button both suppressed, that was an unrecoverable softlock.
+            try { RestoreForcedCanvasOrders(); } catch { /* ignore */ }
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(UIPassiveSuccessionPopup), nameof(UIPassiveSuccessionPopup.Close))]
@@ -3465,6 +3569,7 @@ namespace abcdcode_LOGLIKE_MOD
             if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return;
             LogLikeRoutines.SetBattleSettingCardPanelVisible(true);
+            ReapplyPrepareDrawOrderAfterPopup();
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(UIPassiveSuccessionPopup), nameof(UIPassiveSuccessionPopup.CloseDefault))]
@@ -3473,6 +3578,28 @@ namespace abcdcode_LOGLIKE_MOD
             if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return;
             LogLikeRoutines.SetBattleSettingCardPanelVisible(true);
+            ReapplyPrepareDrawOrderAfterPopup();
+        }
+
+        /// <summary>
+        /// Restore the inventory-above-HUD fix that <see cref="UIPassiveSuccessionPopup_Open"/> gave
+        /// up, now that the popup is gone. Without this the RMR HUD clone covers the book list again.
+        /// </summary>
+        private static void ReapplyPrepareDrawOrderAfterPopup()
+        {
+            try
+            {
+                if (_lastPrepareEditPanel == null)
+                    return;
+                if (_lastPrepareTab != UIBattleSettingEditTap.EquipPage
+                    && _lastPrepareTab != UIBattleSettingEditTap.BattleCard)
+                    return;
+                RepairPrepareInventoryDrawOrder(_lastPrepareEditPanel, _lastPrepareTab);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR UI] re-applying prepare draw order after popup failed: " + ex.Message);
+            }
         }
 
         /*
@@ -3512,7 +3639,21 @@ namespace abcdcode_LOGLIKE_MOD
         [HarmonyPrefix, HarmonyPatch(typeof(UIPopupWindowManager), nameof(UIPopupWindowManager.Update))]
         public static bool UIPopupWindowManager_Update()
         {
-            return !LogLikeRoutines.IsRoguelikeBattleSettingContext() || UI.UIController.Instance.CurrentUIPhase != UIPhase.BattleSetting;
+            if (!LogLikeRoutines.IsRoguelikeBattleSettingContext()
+                || UI.UIController.Instance.CurrentUIPhase != UIPhase.BattleSetting)
+                return true;
+            // Escape hatch. Vanilla Update only reads ESC, and suppressing it wholesale meant a
+            // popup that ended up behind another layer could never be closed. Only let ESC through
+            // while a popup is genuinely open, so it closes that popup instead of opening the
+            // system menu.
+            try
+            {
+                if (UIPassiveSuccessionPopup.Instance != null
+                    && UIPassiveSuccessionPopup.Instance.isActiveAndEnabled)
+                    return true;
+            }
+            catch { /* singleton not ready */ }
+            return false;
         }
 
 
@@ -4165,6 +4306,11 @@ namespace abcdcode_LOGLIKE_MOD
         [HarmonyPostfix, HarmonyPatch(typeof(UIBattleSettingEditPanel), nameof(UIBattleSettingEditPanel.Close))]
         public static void UIBattleSettingEditPanel_Close()
         {
+            // Unconditional: the forced orders belong to the prepare screen, and leaving them
+            // applied is what leaked into battle and buried the post-battle reward Skip button.
+            // Runs even outside a roguelike run so a stray raise can never survive the screen.
+            try { RestoreForcedCanvasOrders(); } catch { /* ignore */ }
+            _lastPrepareEditPanel = null;
             if (!LogLikeMod.CheckStage())
                 return;
             LoguePlayDataSaver.SavePlayData_Menu();
@@ -4528,26 +4674,83 @@ namespace abcdcode_LOGLIKE_MOD
         [HarmonyPostfix, HarmonyPatch(typeof(LocalizedTextLoader), nameof(LocalizedTextLoader.LoadOthers))]
         public static void LocalizedTextLoader_LoadOthers(string language)
         {
-            LogLikeMod.LoadTextData(language);
+            ApplyVanillaLocalizeForLanguage(language, "LoadOthers");
+        }
+
+        /// <summary>Language of the last full vanilla-localize pass, so a missed pass can be caught up.</summary>
+        private static string _lastVanillaLocalizeLanguage;
+
+        /// <summary>
+        /// Re-stamp every vanilla text table RMR rewrites, for one language.
+        /// Split out of the LoadOthers postfix because the game does not always run LoadOthers on a
+        /// language change: switching cn-&gt;en did, en-&gt;cn did not. The abnormality/battle tables then
+        /// stayed English under a Chinese UI, and Chinese text left under an English font rendered as
+        /// tofu. <see cref="EnsureVanillaLocalizeMatchesLanguage"/> is the catch-up trigger.
+        /// </summary>
+        public static void ApplyVanillaLocalizeForLanguage(string language, string reason)
+        {
+            // LoadTextData used to run unguarded here -- the only unprotected top-level call in the
+            // whole chain. It is 200+ lines of reflection over every loaded mod assembly, so anything
+            // it threw skipped all refreshes below AND propagated back into vanilla LoadOthers,
+            // breaking localization init for the rest of the session.
+            try { LogLikeMod.LoadTextData(language); }
+            catch (Exception ex) { Debug.LogWarning($"[RMR Localize] LoadTextData failed ({reason}): " + ex.Message); }
             // Equip reward desc was registered before book/localize load — re-stamp CN names.
             try { RewardingModel.RefreshAllEquipRewardXmlData(); }
-            catch (Exception ex) { Debug.LogWarning("[RMR Localize] equip reward refresh after LoadOthers failed: " + ex.Message); }
-            try { LogLikeMod.RefreshVanillaAbnormalityTextData(language, "LoadOthers"); }
-            catch (Exception ex) { Debug.LogWarning("[RMR Localize] vanilla abno refresh after LoadOthers failed: " + ex.Message); }
+            catch (Exception ex) { Debug.LogWarning("[RMR Localize] equip reward refresh failed: " + ex.Message); }
+            try { LogLikeMod.RefreshVanillaAbnormalityTextData(language, reason); }
+            catch (Exception ex) { Debug.LogWarning("[RMR Localize] vanilla abno refresh failed: " + ex.Message); }
             // Combat page ability / keyword texts (shop hover EN mix-up).
-            try { LogLikeMod.RefreshVanillaBattleLocalize(language, "LoadOthers"); }
-            catch (Exception ex) { Debug.LogWarning("[RMR Localize] battle localize refresh after LoadOthers failed: " + ex.Message); }
+            try { LogLikeMod.RefreshVanillaBattleLocalize(language, reason); }
+            catch (Exception ex) { Debug.LogWarning("[RMR Localize] battle localize refresh failed: " + ex.Message); }
             // Key pages: reload vanilla Books/PassiveDesc then re-apply mod BookInfo/PassiveInfo.
             // Bare LoadPassiveDesc alone CLEARS mod keys → workshop passives fall back to Hangul XML.
-            try { LogLikeMod.RefreshVanillaBookAndPassiveLocalize(language, "LoadOthers"); }
-            catch (Exception ex) { Debug.LogWarning("[RMR Localize] book/passive reload after LoadOthers failed: " + ex.Message); }
+            try { LogLikeMod.RefreshVanillaBookAndPassiveLocalize(language, reason); }
+            catch (Exception ex) { Debug.LogWarning("[RMR Localize] book/passive reload failed: " + ex.Message); }
             // Binah Floor Realization phase captions (BossBirdText) must follow game language.
             // Without this, wrong package can leave Korean lines during a Chinese client session.
-            try { LogLikeMod.ReloadVanillaBossBirdTextForLanguage(language, "LoadOthers"); }
-            catch (Exception ex) { Debug.LogWarning("[RMR Localize] BossBirdText reload after LoadOthers failed: " + ex.Message); }
+            try { LogLikeMod.ReloadVanillaBossBirdTextForLanguage(language, reason); }
+            catch (Exception ex) { Debug.LogWarning("[RMR Localize] BossBirdText reload failed: " + ex.Message); }
             // Opening PV + librarian names: once per language (cached inside helpers).
-            try { LogLikeMod.ReloadOpeningLyricsForLanguage(language, "LoadOthers"); } catch { }
-            try { LogLikeMod.ReloadLibrariansNamesForLanguage(language, "LoadOthers"); } catch { }
+            try { LogLikeMod.ReloadOpeningLyricsForLanguage(language, reason); } catch { }
+            try { LogLikeMod.ReloadLibrariansNamesForLanguage(language, reason); } catch { }
+            // Store canonical: vanilla passes several spellings for one language, and comparing a raw
+            // parameter against a live lookup made the catch-up below think nothing had changed.
+            _lastVanillaLocalizeLanguage = LogLikeMod.CanonicalizeLanguageTag(language);
+        }
+
+        /// <summary>
+        /// Catch-up: if the live language no longer matches the last full pass, redo the pass.
+        /// A cheap string compare when they already agree, so this is safe on hot UI entry points.
+        /// </summary>
+        public static void EnsureVanillaLocalizeMatchesLanguage(string reason)
+        {
+            try
+            {
+                // TextDataModel.CurrentLanguage tracks an in-session switch immediately;
+                // ResolveInitialTextLanguage reads option.dat first and can lag until the game exits.
+                string raw;
+                try { raw = TextDataModel.CurrentLanguage.ToString(); }
+                catch { raw = LogLikeMod.GetActiveTextLanguage(); }
+                if (string.IsNullOrEmpty(raw))
+                    return;
+                string lang = LogLikeMod.CanonicalizeLanguageTag(raw);
+                bool matches = !string.IsNullOrEmpty(_lastVanillaLocalizeLanguage)
+                    && string.Equals(lang, _lastVanillaLocalizeLanguage, StringComparison.OrdinalIgnoreCase);
+                // Logged unconditionally: when a switch failed to re-sync there was no record at all
+                // of why, which made the whole thing unfalsifiable from a player's log.
+                // Sampled at display time, not just after a reload: if the reload logs OK and this
+                // logs MISMATCH, something between the two is overwriting the table.
+                Debug.Log($"[RMR Localize] lang check: live='{raw}'->'{lang}' lastStamped='{_lastVanillaLocalizeLanguage ?? "none"}' "
+                    + $"match={matches} reason={reason} | {LogLikeMod.SampleAbnormalityTextScript(lang)}");
+                if (matches)
+                    return;
+                ApplyVanillaLocalizeForLanguage(raw, reason);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR Localize] EnsureVanillaLocalizeMatchesLanguage: " + ex.Message);
+            }
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(LocalizedTextLoader), nameof(LocalizedTextLoader.LoadOpeningLyrics))]
@@ -4787,6 +4990,9 @@ namespace abcdcode_LOGLIKE_MOD
         {
             try
             {
+                // Full re-sync first when the language changed behind our back; this used to refresh
+                // book/passive only, which is why abnormality text stayed in the previous language.
+                EnsureVanillaLocalizeMatchesLanguage(reason);
                 string lang = TextDataModel.CurrentLanguage.ToString();
                 LogLikeMod.RefreshVanillaBookAndPassiveLocalize(lang, reason);
                 LogLikeMod.EnsureLocalizedFonts(reason, repairActiveUi: true);
@@ -5105,6 +5311,10 @@ namespace abcdcode_LOGLIKE_MOD
         [HarmonyPostfix, HarmonyPatch(typeof(UI.UIController), nameof(UI.UIController.CallUIPhase), new Type[1] { typeof(UIPhase) })]
         public static void UIController_CallUIPhase(UIController __instance, UIPhase phase)
         {
+            // Second catch-up point for a language switch the game did not route through
+            // LoadOthers. No-op string compare unless the language actually changed.
+            try { EnsureVanillaLocalizeMatchesLanguage("CallUIPhase." + phase); } catch { /* ignore */ }
+
             // Only heavy-repair on rare phase transitions (not every BattleSetting open).
             try
             {
@@ -5377,6 +5587,15 @@ namespace abcdcode_LOGLIKE_MOD
             __result = num;
         }
 
+        /// <summary>
+        /// skin name -> vanilla thumbnail sprite. GetThumbSprite runs once per rendered book slot,
+        /// and the reward / compendium / prep screens draw dozens at a time; each miss used to do a
+        /// linear Find over the entire BookXmlList plus a Resources.Load, which is what made those
+        /// screens hitch. Sprites here are Resources-owned, so caching the reference is safe.
+        /// </summary>
+        private static readonly Dictionary<string, Sprite> _lorThumbSpriteBySkin =
+            new Dictionary<string, Sprite>(StringComparer.Ordinal);
+
         [HarmonyPostfix, HarmonyPatch(typeof(BookModel), nameof(BookModel.GetThumbSprite))]
         public static void BookModel_GetThumbSprite(BookModel __instance, ref Sprite __result)
         {
@@ -5388,8 +5607,22 @@ namespace abcdcode_LOGLIKE_MOD
             {
                 if (__instance.ClassInfo.skinType == "Lor")
                 {
+                    string skin = __instance.ClassInfo.CharacterSkin[0];
+                    if (skin != null && _lorThumbSpriteBySkin.TryGetValue(skin, out Sprite cached))
+                    {
+                        if (cached != null)
+                            __result = cached;
+                        return;
+                    }
                     BookXmlInfo bookXmlInfo = Singleton<BookXmlList>.Instance.GetList().Find((Predicate<BookXmlInfo>)(x => x.CharacterSkin[0] == __instance.ClassInfo.CharacterSkin[0] && !x.id.IsWorkshop()));
-                    __result = UnityEngine.Resources.Load<Sprite>("Sprites/Books/Thumb/" + bookXmlInfo.id.id.ToString());
+                    Sprite resolved = bookXmlInfo != null
+                        ? UnityEngine.Resources.Load<Sprite>("Sprites/Books/Thumb/" + bookXmlInfo.id.id.ToString())
+                        : null;
+                    // Cache misses too: a skin with no vanilla book must not re-scan every frame.
+                    if (skin != null)
+                        _lorThumbSpriteBySkin[skin] = resolved;
+                    if (resolved != null)
+                        __result = resolved;
                 }
                 else
                 {

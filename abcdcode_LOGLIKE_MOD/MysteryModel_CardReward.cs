@@ -169,6 +169,10 @@ namespace abcdcode_LOGLIKE_MOD
             else
             {
                 Image image = ModdingUtils.CreateImage(LogLikeMod.LogUIObjs[90].transform, "MysteryPanel_transparent", new Vector2(1f, 1f), new Vector2(0.0f, 0.0f));
+                // 1920x1080 backdrop. It is decoration, but Image defaults raycastTarget to true, so
+                // if anything ever paints it above the buttons on LogUIObjs[100] it also eats their
+                // clicks. Defence in depth alongside the canvas-order restore in LogLikePatches.
+                try { image.raycastTarget = false; } catch { /* ignore */ }
                 this.FrameObj.Add("Frame", image.gameObject);
                 TextMeshProUGUI textTmp1 = ModdingUtils.CreateText_TMP(image.transform, new Vector2(140f, -30f), 45, new Vector2(0.0f, 0.0f), new Vector2(1f, 1f), new Vector2(0.0f, 0.0f), TextAlignmentOptions.TopLeft, LogLikeMod.DefFontColor, LogLikeMod.DefFont_TMP);
                 textTmp1.text = TextDataModel.GetText("BattleEnd_CardReward");
@@ -249,6 +253,20 @@ namespace abcdcode_LOGLIKE_MOD
         private void HandleEmptyCardChoices()
         {
             Debug.Log($"[RMR CardReward] Drop book produced no card choices: {this.curRewardid.packageId}:{this.curRewardid.id}");
+            // An empty pool is a skip from the player's point of view — they were never offered a
+            // choice. Upstream still drew the Skip button here, so the click counted; RMR's post
+            // filter (owned / upgraded / duplicate originalId) empties the pool more and more as a
+            // run goes on, and silently swallowing those made Pierre's meat-pie quest, which needs
+            // five skips, impossible to finish. Effects like ConceptConverter lose their payout too.
+            try
+            {
+                Singleton<GlobalLogueEffectManager>.Instance.OnSkipCardRewardChoose(
+                    this.choicelist ?? new List<DiceCardXmlInfo>());
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR CardReward] empty-pool skip callback failed: " + ex.Message);
+            }
             this.CompleteRewardFlow();
         }
         #endregion

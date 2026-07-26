@@ -30,7 +30,7 @@ namespace abcdcode_LOGLIKE_MOD
             this.UpgradeInfoCache = new List<System.Type>();
             foreach (Assembly assem in LogLikeMod.GetAssemList())
             {
-                foreach (System.Type type in assem.GetTypes())
+                foreach (System.Type type in LogLikeMod.GetLoadableTypes(assem))
                 {
                     if (type.Name.Contains("UpgradeModel"))
                         this.UpgradeInfoCache.Add(type);

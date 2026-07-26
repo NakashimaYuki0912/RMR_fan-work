@@ -32,9 +32,12 @@ foreach ($pattern in @(
     "class RMRAbnormalityBattleRouter",
     "GetCandidateStageIds",
     "PickStageForChapter",
-    "LowTierStageIds",
-    "MidTierStageIds",
-    "HighTierStageIds",
+    # The router was reshaped from Low/Mid/HighTierStageIds into one pool filtered by librarian
+    # count; these assertions were left behind and made the whole check throw before reaching
+    # anything else. Assert the members that actually exist now.
+    "RegularAbnormalityStageIds",
+    "GetMaxLibrariansForChapter",
+    "GetRequiredLibrarianCount",
     "201001",
     "202001",
     "203001",
@@ -94,6 +97,34 @@ $stages = @(
 foreach ($stageFile in $stages) {
     $content = Read-Text $stageFile
     Require-Contains $content 'StageType="Creature"' "route creature card in $stageFile"
+}
+
+# Cross-validate RMR placeholder stage ids (99xxxx) referenced by the node maps against their
+# definitions in AddData/StageInfo. e998173 deleted 991001-991003 / 991101-991107 while the node
+# maps kept referencing them; the game then logged "INVALID STAGE REMOVED FROM STAGE LIST ON
+# INITIALIZE" and silently dropped every creature and abnormality-mystery node, for every run.
+# Only the 99xxxx range is checked — other ids in the node maps are vanilla stages with no
+# definition in AddData, so a blanket check would be all false positives.
+$definedStageIds = New-Object 'System.Collections.Generic.HashSet[string]'
+foreach ($defFile in (Get-ChildItem -LiteralPath (Join-Path $root 'AddData\StageInfo') -Filter '*.xml' -Recurse)) {
+    $defText = Get-Content -LiteralPath $defFile.FullName -Raw -Encoding UTF8
+    foreach ($m in [regex]::Matches($defText, '<Stage\s+id="(\d+)"')) {
+        [void]$definedStageIds.Add($m.Groups[1].Value)
+    }
+}
+
+$missingRefs = @()
+foreach ($mapFile in (Get-ChildItem -LiteralPath (Join-Path $root 'SpecialStaticInfo\StagesXmlInfos') -Filter 'Stage_ch*.xml')) {
+    $mapText = Get-Content -LiteralPath $mapFile.FullName -Raw -Encoding UTF8
+    foreach ($m in [regex]::Matches($mapText, 'ID="(99\d{4})"')) {
+        $refId = $m.Groups[1].Value
+        if (-not $definedStageIds.Contains($refId)) {
+            $missingRefs += "$($mapFile.Name) references undefined stage $refId"
+        }
+    }
+}
+if ($missingRefs.Count -gt 0) {
+    throw ("Node maps reference RMR stage ids with no <Stage id=...> definition in AddData/StageInfo:`n  " + ($missingRefs -join "`n  "))
 }
 
 "RMR ABNORMALITY BATTLE STATIC CHECK PASSED"

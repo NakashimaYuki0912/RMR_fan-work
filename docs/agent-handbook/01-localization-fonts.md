@@ -19,7 +19,7 @@
 | 现象 | 常见根因 | 不是这个 |
 |---|---|---|
 | **口口口 / tofu** | 字体缺字形；错误字体（韩文 Noto 当中文）；Fallback 局部 atlas；文本本身已是错误编码 | 单纯字号太小 |
-| **字能认但糊** | `FontStyles.Bold` 伪粗体（CJK SDF 无真粗体）；`tmp.font=` 不绑匹配材质；OS 动态 `CreateFontAsset` | 本地化缺键 |
+| **字能认但糊** | `FontStyles.Bold` 伪粗体（CJK SDF 无真粗体）；`tmp.font=` 不绑匹配材质；OS 动态 `CreateFontAsset`；**中文槽位被写成 kr/jp 面或 Serif/Medium 面** | 本地化缺键 |
 | **显示英文键 / 空白** | `Localize` 缺键或语言目录错 | 字体问题 |
 | **乱码 mojibake** | 文件用系统默认编码保存（中文 Windows 常为 GBK），游戏按 UTF-8 读 | TMP Bold |
 
@@ -70,6 +70,36 @@ DefFont_TMP = ''
 ```
 
 说明早期拿到了空名软字体；当前代码应丢弃并重解析。若仍出现，查是否有代码路径绕过 getter 直接写 `_DefFont_TMP`。
+
+### 2.1 字形区域铁律（2026-07-26 加固）
+
+**Noto CJK 是泛 CJK 字族**：`NotoSansCJKkr` / `NotoSerifCJKkr` 同样含有汉字，
+`HasCharacter('图')` 会返回 true。**所以「能显示中文」证明不了「是中文字体」。**
+
+```text
+❌ 曾经发生：
+[RMR Localize] LocalizedFontSetter.cnFont_notoSansCJKsc:
+    '[Fallback_1]NotoSansCJKsc-Regular SDF' → 'NotoSerifCJKkr-Medium SDF' (lang=cn).
+→ 原版 SetLocalizedFont(cn) 之后把韩文 Serif Medium 发给每一个中文 TMP → 全局糊
+```
+
+规则：
+
+- 判定语言可用性 **必须** 走 `IsFaceRegionAcceptableForLanguage`：
+  cn/trcn 只收 `sc`；kr 只收 `kr`；jp 只收 `jp`；en 不限（原版 en 本来就用 kr 面）。
+- **`[Fallback_N]` 前缀不等于坏字体。** 原版 cn 槽位存的就是
+  `[Fallback_1]NotoSansCJKsc-Regular SDF`，那是正牌 SC 资源。判断前先
+  `StripTmpFallbackPrefix`。
+- 两个判定函数分工，**不要互换**：
+
+| 函数 | 用途 |
+|---|---|
+| `IsTmpFontCompatibleWithLanguage` | 从零**挑选新主字体**时用；仍否决 Fallback 名，防局部 atlas 导致 口口口 |
+| `IsUsableLanguageFace` | 评价**原版已经装好**的面（setter 槽位、live TMP）；忽略 Fallback 标签 |
+
+- 写 `LocalizedFontSetter` 任何语言槽位一律经 `PatchSetterFontField`，
+  它会硬拦截区域不符的面并 `LogWarning`；**禁止**再加绕过它的直写路径。
+- 字重偏好：Sans + Regular 优先，Serif / Medium / Bold 在小字号 SDF 上就是糊（`ScoreFace`）。
 
 ---
 
