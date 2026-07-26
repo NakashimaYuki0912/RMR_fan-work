@@ -31,11 +31,20 @@ namespace abcdcode_LOGLIKE_MOD
                 LogLikeMod.DefFontColor = UIColorManager.Manager.GetUIColor(UIColor.Default);
             }
             // Do not copy options-dropdown font (Latin-only). Patch cnFont_* for mystery UI.
-            LogLikeMod.EnsureLocalizedFonts("StartMystery", repairActiveUi: true);
+            // Resolve the font, but no scene sweep: the mystery UI is built by Init() below, so a
+            // sweep here would scan the outgoing screen and still miss everything it creates.
+            LogLikeMod.EnsureLocalizedFonts("StartMystery", repairActiveUi: false);
             this.curMystery = MysteryBase.FindMystery(info.script);
             this.curMystery.xmlinfo = info;
             this.interruptMysterys = new List<MysteryBase>();
             this.curMystery.Init();
+            // Repair what Init actually built, scoped to the mystery host object.
+            try
+            {
+                if (LogLikeMod.LogUIObjs != null && LogLikeMod.LogUIObjs.ContainsKey(90))
+                    LogLikeMod.RepairTmpFontsUnder(LogLikeMod.LogUIObjs[90], "StartMystery");
+            }
+            catch { /* never block a mystery from opening */ }
         }
 
         public void AddInterrupt(MysteryBase mystery)

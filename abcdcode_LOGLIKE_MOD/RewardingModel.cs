@@ -1740,8 +1740,10 @@ namespace abcdcode_LOGLIKE_MOD
             RewardingModel.rewardFlag = RewardingModel.RewardFlag.EmtoionChoose;
             // Vanilla: at team emotion 3/4/5, after abno pick comes floor E.G.O. selection.
             ArmMidBattleEgoAfterEmotionIfNeeded();
-            // One throttled font repair is enough (second pass was doubling FindObjectsOfType cost).
-            try { LogLikeMod.EnsureLocalizedFonts("PickEmotion", repairActiveUi: true); } catch { }
+            // Font resolve only -- no scene sweep. This runs BEFORE ui_levelup.Init, so a sweep here
+            // would scan the previous screen's TMP and still miss the slots about to be built. The
+            // LevelUpUI.InitBase postfix repairs that panel after Init, scoped to the panel itself.
+            try { LogLikeMod.EnsureLocalizedFonts("PickEmotion", repairActiveUi: false); } catch { }
             SingletonBehavior<BattleManagerUI>.Instance.ui_levelup.Init(emotions.Count, emotions);
         }
 

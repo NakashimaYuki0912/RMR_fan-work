@@ -1699,6 +1699,18 @@ namespace abcdcode_LOGLIKE_MOD
         /// Removes base versions of cards from cardlist when an upgraded version exists.
         /// Ensures "once upgraded, always upgraded" — base cards are replaced by their upgraded counterparts.
         /// </summary>
+        /// <summary>True when the id carries the upgrade marker in its packageId.</summary>
+        private static bool IsUpgradedCardId(LorId id)
+        {
+            try
+            {
+                return id != null
+                    && !string.IsNullOrEmpty(id.packageId)
+                    && id.packageId.Contains(LogCardUpgradeManager.UpgradeKeyword);
+            }
+            catch { return true; }   // unsure -> keep the old always-purge behaviour
+        }
+
         public static void PurgeBaseCardsWhenUpgradeExists()
         {
             // Invitation hub / pre-run atlas may call GetCardList before a run initializes cardlist.
@@ -1809,19 +1821,22 @@ namespace abcdcode_LOGLIKE_MOD
             DiceCardItemModel diceCardItemModel = LogueBookModels.cardlist.Find(x => x.GetID() == cardId);
             if (diceCardItemModel != null)
             {
-                // Card type already unlocked — ensure count stays at UNLOCKED_CARD_COUNT
+                // Card type already unlocked — ensure count stays at UNLOCKED_CARD_COUNT.
+                // Nothing was inserted, so neither the sort nor the upgrade purge can change
+                // anything; both used to run anyway on every single AddCard call.
                 diceCardItemModel.num = LogueBookModels.UNLOCKED_CARD_COUNT;
+                return;
             }
-            else
+
+            LogueBookModels.cardlist.Add(new DiceCardItemModel(cardItem)
             {
-                LogueBookModels.cardlist.Add(new DiceCardItemModel(cardItem)
-                {
-                    num = LogueBookModels.UNLOCKED_CARD_COUNT
-                });
-                LogueBookModels.cardlist.Sort(new Comparison<DiceCardItemModel>(SortUtil.CardItemCompByCost));
-            }
-            // Ensure base versions are cleaned up when upgrade exists
-            LogueBookModels.PurgeBaseCardsWhenUpgradeExists();
+                num = LogueBookModels.UNLOCKED_CARD_COUNT
+            });
+            LogueBookModels.cardlist.Sort(new Comparison<DiceCardItemModel>(SortUtil.CardItemCompByCost));
+            // Only an upgraded card can orphan a base version, so skip the full-inventory sweep
+            // for ordinary cards. This runs once per reward pick, per shop buy, per load entry.
+            if (IsUpgradedCardId(cardId))
+                LogueBookModels.PurgeBaseCardsWhenUpgradeExists();
         }
 
         // Permanently remove a card type from the unlocked inventory.

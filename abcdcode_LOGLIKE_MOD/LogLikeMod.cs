@@ -521,6 +521,47 @@ namespace abcdcode_LOGLIKE_MOD
         /// Preserves TextMeshProMaterialSetter presets when their material already matches the font atlas —
         /// blindly assigning font.material was a common source of soft/blurry Chinese SDF UI.
         /// </summary>
+        /// <summary>
+        /// Repair only the TMP under <paramref name="root"/>. The scene-wide pass walks every
+        /// TextMeshProUGUI in the scene, which is far too heavy to run when one freshly built panel
+        /// is all that needs checking -- doing that on the post-battle reward screen was a visible hitch.
+        /// </summary>
+        public static void RepairTmpFontsUnder(GameObject root, string reason)
+        {
+            if (root == null)
+                return;
+            TMP_FontAsset font = LogLikeMod.DefFont_TMP;
+            if (font == null || IsLowQualityTmpFont(font))
+                return;
+            string lang = ResolveInitialTextLanguage();
+            int fixedCount = 0;
+            try
+            {
+                foreach (TextMeshProUGUI tmp in root.GetComponentsInChildren<TextMeshProUGUI>(true))
+                {
+                    if (tmp == null)
+                        continue;
+                    TMP_FontAsset cur = tmp.font;
+                    bool bad = cur == null
+                        || string.IsNullOrEmpty(cur.name)
+                        || !IsUsableLanguageFace(cur, lang)
+                        || TextWouldTofu(cur, tmp.text);
+                    if (!bad)
+                        continue;
+                    if (ApplyTmpFontPreservingSharpMaterial(tmp, font))
+                        fixedCount++;
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_localizeVerboseLogs)
+                    Debug.LogWarning("[RMR Localize] RepairTmpFontsUnder failed: " + ex.Message);
+                return;
+            }
+            if (fixedCount > 0)
+                Debug.Log($"[RMR Localize] RepairTmpFontsUnder fixed={fixedCount} reason={reason}.");
+        }
+
         public static void RepairActiveTmpFonts(string reason)
         {
             TMP_FontAsset font = LogLikeMod.DefFont_TMP;

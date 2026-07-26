@@ -77,7 +77,7 @@ namespace RogueLike_Mod_Reborn
         public const string packageId = "abcdcodecalmmagma.LogueLikeReborn";
         public static CustomMapHandler RMRMapHandler;
 
-        public const string BuildTimestamp = "2026-07-26Tperf-artwork-index-thumb-cache+08:00";
+        public const string BuildTimestamp = "2026-07-26Tperf-scoped-repair-sharp-cjk+08:00";
 
         #endregion
 

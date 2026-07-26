@@ -1505,9 +1505,10 @@ namespace abcdcode_LOGLIKE_MOD
             orig(self, selectedCount, isEgo);
             // Vanilla just filled the reward slots. Their names come from mod data that may still be
             // Chinese while the UI language is English, and the English face has no CJK glyphs, so
-            // they draw as 口口口. Repair here, right after the slots exist and before the player
-            // sees them -- the scene-wide pass is throttled and can miss this screen entirely.
-            try { LogLikeMod.EnsureLocalizedFonts("LevelUpUI.InitBase", repairActiveUi: true); }
+            // they draw as 口口口. Scope the repair to this panel: the scene-wide sweep costs a
+            // FindObjectsOfType over every TMP in the scene and its 4s throttle almost always
+            // expires between battles, so it ran in full right as the reward screen opened.
+            try { LogLikeMod.RepairTmpFontsUnder(self.gameObject, "LevelUpUI.InitBase"); }
             catch { /* never block the reward UI */ }
             if (LogLikeMod.CheckStage(true))
             {
