@@ -34,9 +34,11 @@ Write-Host "Copying clean content:" -ForegroundColor Cyan
 Write-Host "  from $SourceRoot"
 Write-Host "  to   $uploadRoot"
 
-# robocopy mirrors structure; exclude backups/dev noise
+# robocopy mirrors structure; exclude backups/dev noise.
+# *.old matters: deploy_workshop.ps1 keeps the previous DLL as "RogueLike Mod Reborn.dll.old",
+# and without this it shipped to subscribers as a second ~1.4 MB assembly in Assemblies\dlls.
 & robocopy $SourceRoot $uploadRoot /E /NFL /NDL /NJH /NJS /nc /ns /np `
-    /XF *.bak *.pre_* *~ *.pdb `
+    /XF *.bak *.pre_* *~ *.pdb *.old `
     /XD _codex_backups DevNuggets .git | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
 $global:LASTEXITCODE = 0

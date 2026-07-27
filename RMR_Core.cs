@@ -1,4 +1,4 @@
-// -----------------------------------------------------------------------------
+﻿// -----------------------------------------------------------------------------
 // RogueLike Mod Reborn (RMR): RMR_Core
 // Namespace/file: ruina-roguelike-reborn-main\RMR_Core.cs
 // English comments/regions for maintainability. Do not rename disk save keys.
@@ -77,7 +77,7 @@ namespace RogueLike_Mod_Reborn
         public const string packageId = "abcdcodecalmmagma.LogueLikeReborn";
         public static CustomMapHandler RMRMapHandler;
 
-        public const string BuildTimestamp = "2026-07-27Tcontinue-deck-restore-fix+08:00";
+        public const string BuildTimestamp = "2026-07-27Tcontinue-upgraded-cards-restore-local+08:00";
 
         #endregion
 
@@ -299,7 +299,7 @@ namespace RogueLike_Mod_Reborn
         }
 
         /// <summary>
-        /// Close stuck 指定司书剧情 / story archives overlays (often left open after Floor Realization).
+        /// Close stuck 鎸囧畾鍙镐功鍓ф儏 / story archives overlays (often left open after Floor Realization).
         /// </summary>
         public static void ForceDismissStoryArchivesAndReturnMain()
         {
@@ -334,7 +334,7 @@ namespace RogueLike_Mod_Reborn
                 try { Singleton<GlobalLogueItemCatalogPanel>.Instance?.Deactivate(); } catch { }
                 try { ui.ClearActivatePanel(); } catch { }
 
-                // Return to main library / invitation surface so 杂质+指定司书剧情 is not stuck on top.
+                // Return to main library / invitation surface so 鏉傝川+鎸囧畾鍙镐功鍓ф儏 is not stuck on top.
                 try { ui.CallUIPhase(UIPhase.Sephirah); } catch { }
                 try { ui.CallUIPhase(UIPhase.Invitation); } catch { }
 
@@ -2838,7 +2838,7 @@ namespace RogueLike_Mod_Reborn
                     if (!RMRAbnormalityUnlockManager.CanAppearInNormalReceptionAbnoPool(info))
                         continue;
                     // GradeAll exclusive rows must still respect current-chapter floor tier
-                    // (e.g. Binah exclusives after clear do not flood Grade1–3 pools).
+                    // (e.g. Binah exclusives after clear do not flood Grade1鈥? pools).
                     if (!RMRAbnormalityUnlockManager.IsRewardTierAvailableForChapter(
                             RMRAbnormalityUnlockManager.GetTierForRewardPage(info), grade))
                         continue;
@@ -4144,7 +4144,7 @@ namespace RogueLike_Mod_Reborn
         #region PREFIXES
 
         /// <summary>
-        /// Skip the -853 shell prepare (闪光 / 当前舞台1/1). When realization was chosen with a
+        /// Skip the -853 shell prepare (闂厜 / 褰撳墠鑸炲彴1/1). When realization was chosen with a
         /// pre-selected floor, rebind to the multi-wave floor stage before the first prepare paints.
         /// </summary>
         [HarmonyPrefix, HarmonyPatch(typeof(UI.UIController), "OpenBattlePrepare")]

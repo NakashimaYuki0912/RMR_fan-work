@@ -2939,18 +2939,42 @@ namespace abcdcode_LOGLIKE_MOD
         /// Translators: add/edit text under Localize — see docs/localization/.
         /// Explicit prefixes always apply; other keys only while an RMR run/realization is active.
         /// </summary>
-        [HarmonyPrefix, HarmonyPatch(typeof(TextDataModel), nameof(TextDataModel.GetText))]
-        public static bool TextDataModel_GetText(string id, ref string __result, params object[] args)
+        /// <summary>
+        /// Postfix, deliberately not a blocking prefix.
+        ///
+        /// This used to be a prefix returning false, which in Harmony skips the original method AND
+        /// every later prefix. Once a run started, ShouldOverrideVanillaTextWithRmrText accepted
+        /// nearly every key, so any other localization mod's patch on GetText was silently dropped --
+        /// the most likely reason RMR + Localization Manager crashed during load rather than merely
+        /// disagreeing about text.
+        ///
+        /// As a postfix, other mods still run, and a throw here costs only RMR's own override
+        /// instead of breaking GetText for the whole game.
+        /// </summary>
+        [HarmonyPostfix, HarmonyPatch(typeof(TextDataModel), nameof(TextDataModel.GetText))]
+        public static void TextDataModel_GetText(string id, ref string __result, params object[] args)
         {
-            if (!ShouldOverrideVanillaTextWithRmrText(id))
-                return true;
+            try
+            {
+                if (!ShouldOverrideVanillaTextWithRmrText(id))
+                    return;
 
-            string text = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText(id, args);
-            if (!(text != string.Empty))
-                return true;
-            __result = RewardingModel.SanitizeDisplayText(text);
-            return false;
+                string text = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText(id, args);
+                if (string.IsNullOrEmpty(text))
+                    return;
+                __result = RewardingModel.SanitizeDisplayText(text);
+            }
+            catch (Exception ex)
+            {
+                // GetText is called from everywhere; never let it fail because of RMR.
+                if (_loggedGetTextFailure)
+                    return;
+                _loggedGetTextFailure = true;
+                Debug.LogWarning("[RMR Localize] TextDataModel.GetText override failed (logged once): " + ex.Message);
+            }
         }
+
+        private static bool _loggedGetTextFailure;
 
         /// <summary>Whether RMR may replace vanilla TextDataModel.GetText for this id.</summary>
         private static bool ShouldOverrideVanillaTextWithRmrText(string id)
@@ -3644,6 +3668,13 @@ namespace abcdcode_LOGLIKE_MOD
             // tab the raised inventory canvas painted straight over this popup — and with ESC and
             // the back button both suppressed, that was an unrecoverable softlock.
             try { RestoreForcedCanvasOrders(); } catch { /* ignore */ }
+            // Same untranslated-passive tofu as the librarian info panel behind it.
+            try
+            {
+                if (UIPassiveSuccessionPopup.Instance != null)
+                    LogLikeMod.RepairTmpFontsUnder(UIPassiveSuccessionPopup.Instance.gameObject, "PassiveSuccessionPopup.Open");
+            }
+            catch { /* ignore */ }
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(UIPassiveSuccessionPopup), nameof(UIPassiveSuccessionPopup.Close))]
@@ -4763,6 +4794,103 @@ namespace abcdcode_LOGLIKE_MOD
         /// <summary>Language of the last full vanilla-localize pass, so a missed pass can be caught up.</summary>
         private static string _lastVanillaLocalizeLanguage;
 
+        #region --- Replaying panel population after a language change ---
+
+        // Vanilla panels copy localized strings into their TMP labels at populate time, and a
+        // language switch does not rebuild a panel that is already on screen.
+        //
+        // The probe settled this: at Invitation.OpenInit it logged table=True (the vanilla
+        // abnormality table already held the NEW language) while the list on screen still showed the
+        // OLD one -- and the hover preview, which reads that same table live, was correct. Same
+        // table, two different languages on one screen. So the tables were never the problem for
+        // those labels; the already-built UI was stale.
+        //
+        // Chasing more tables could not have fixed this. Remember what each panel was populated
+        // with, and replay that call once the resync is done.
+
+        private static UIAbnormalityPanel _lastAbnormalityPanel;
+        private static LibraryFloorModel _lastAbnormalityPanelFloor;
+
+        private static readonly List<KeyValuePair<UICharacterSlot, UnitDataModel>> _characterSlotData =
+            new List<KeyValuePair<UICharacterSlot, UnitDataModel>>();
+
+        [HarmonyPostfix, HarmonyPatch(typeof(UIAbnormalityPanel), nameof(UIAbnormalityPanel.SetData))]
+        public static void UIAbnormalityPanel_SetData_Remember(UIAbnormalityPanel __instance, LibraryFloorModel floor)
+        {
+            _lastAbnormalityPanel = __instance;
+            _lastAbnormalityPanelFloor = floor;
+        }
+
+        // Parameter name must be exactly "unitData": Harmony injects by name, and calling it "unit"
+        // made CreateAndPatchAll abort the whole patch class with "IL Compile Error".
+        [HarmonyPostfix, HarmonyPatch(typeof(UICharacterSlot), nameof(UICharacterSlot.SetCharacter))]
+        public static void UICharacterSlot_SetCharacter_Remember(UICharacterSlot __instance, UnitDataModel unitData)
+        {
+            if (__instance == null)
+                return;
+            try
+            {
+                for (int i = _characterSlotData.Count - 1; i >= 0; i--)
+                {
+                    // Drop destroyed slots while we are here; this list must not grow forever.
+                    if (_characterSlotData[i].Key == null)
+                    {
+                        _characterSlotData.RemoveAt(i);
+                        continue;
+                    }
+                    if (ReferenceEquals(_characterSlotData[i].Key, __instance))
+                        _characterSlotData.RemoveAt(i);
+                }
+                _characterSlotData.Add(new KeyValuePair<UICharacterSlot, UnitDataModel>(__instance, unitData));
+            }
+            catch { /* remembering is best-effort */ }
+        }
+
+        /// <summary>
+        /// Re-populate panels that are still on screen, so their labels pick up the new language.
+        /// Only touches live, active objects; a panel that is closed will repopulate itself anyway.
+        /// </summary>
+        private static void ReplayPanelPopulationForLanguage()
+        {
+            try
+            {
+                if (_lastAbnormalityPanel != null
+                    && _lastAbnormalityPanelFloor != null
+                    && _lastAbnormalityPanel.gameObject != null
+                    && _lastAbnormalityPanel.gameObject.activeInHierarchy)
+                {
+                    _lastAbnormalityPanel.SetData(_lastAbnormalityPanelFloor);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR Localize] abnormality panel replay failed: " + ex.Message);
+            }
+
+            int slots = 0;
+            for (int i = _characterSlotData.Count - 1; i >= 0; i--)
+            {
+                KeyValuePair<UICharacterSlot, UnitDataModel> entry = _characterSlotData[i];
+                try
+                {
+                    if (entry.Key == null)
+                    {
+                        _characterSlotData.RemoveAt(i);
+                        continue;
+                    }
+                    if (entry.Value == null || !entry.Key.gameObject.activeInHierarchy)
+                        continue;
+                    entry.Key.SetCharacter(entry.Value);
+                    slots++;
+                }
+                catch { /* one bad slot must not stop the rest */ }
+            }
+            if (slots > 0)
+                Debug.Log($"[RMR Localize] Replayed panel population for {slots} character slot(s) after a language change.");
+        }
+
+        #endregion
+
         /// <summary>
         /// Re-stamp every vanilla text table RMR rewrites, for one language.
         /// Split out of the LoadOthers postfix because the game does not always run LoadOthers on a
@@ -4770,7 +4898,35 @@ namespace abcdcode_LOGLIKE_MOD
         /// stayed English under a Chinese UI, and Chinese text left under an English font rendered as
         /// tofu. <see cref="EnsureVanillaLocalizeMatchesLanguage"/> is the catch-up trigger.
         /// </summary>
+        /// <summary>
+        /// Guards against cross-mod recursion. This method calls back into eight vanilla loaders,
+        /// which is exactly the set another localization mod patches; if its patch calls LoadOthers
+        /// (or TextDataModel init) again, A->B->A recurses until the stack overflows -- a crash that
+        /// leaves no managed stack trace in Player.log, only a silent exit during loading.
+        /// The per-function Refreshing* flags cannot see that: each only protects itself.
+        /// </summary>
+        private static bool _insideVanillaLocalizePass;
+
         public static void ApplyVanillaLocalizeForLanguage(string language, string reason)
+        {
+            if (_insideVanillaLocalizePass)
+            {
+                Debug.LogWarning($"[RMR Localize] Re-entrant vanilla localize pass ignored (reason={reason}); "
+                    + "another mod re-triggered localization from inside ours.");
+                return;
+            }
+            _insideVanillaLocalizePass = true;
+            try
+            {
+                ApplyVanillaLocalizeForLanguageCore(language, reason);
+            }
+            finally
+            {
+                _insideVanillaLocalizePass = false;
+            }
+        }
+
+        private static void ApplyVanillaLocalizeForLanguageCore(string language, string reason)
         {
             // LoadTextData used to run unguarded here -- the only unprotected top-level call in the
             // whole chain. It is 200+ lines of reflection over every loaded mod assembly, so anything
@@ -4795,11 +4951,28 @@ namespace abcdcode_LOGLIKE_MOD
             try { LogLikeMod.ReloadVanillaBossBirdTextForLanguage(language, reason); }
             catch (Exception ex) { Debug.LogWarning("[RMR Localize] BossBirdText reload failed: " + ex.Message); }
             // Opening PV + librarian names: once per language (cached inside helpers).
-            try { LogLikeMod.ReloadOpeningLyricsForLanguage(language, reason); } catch { }
-            try { LogLikeMod.ReloadLibrariansNamesForLanguage(language, reason); } catch { }
+            // Prefix the reason with "LoadOthers" so the per-language caches inside these helpers
+            // treat a catch-up pass as authoritative. They whitelist LoadOthers/LoadTextData only,
+            // so a resync triggered from Invitation.OpenInit or CallUIPhase was silently skipped and
+            // librarian names stayed in the previous language.
+            string forcedReason = reason != null && reason.StartsWith("LoadOthers", StringComparison.OrdinalIgnoreCase)
+                ? reason
+                : "LoadOthers/resync:" + reason;
+            try { LogLikeMod.ReloadOpeningLyricsForLanguage(language, forcedReason); } catch { }
+            try { LogLikeMod.ReloadLibrariansNamesForLanguage(language, forcedReason); } catch { }
             // Store canonical: vanilla passes several spellings for one language, and comparing a raw
             // parameter against a live lookup made the catch-up below think nothing had changed.
-            _lastVanillaLocalizeLanguage = LogLikeMod.CanonicalizeLanguageTag(language);
+            string canonical = LogLikeMod.CanonicalizeLanguageTag(language);
+            bool languageActuallyChanged = !string.Equals(canonical, _lastVanillaLocalizeLanguage, StringComparison.OrdinalIgnoreCase);
+            _lastVanillaLocalizeLanguage = canonical;
+
+            // Tables are correct now, but panels already on screen still show the strings they were
+            // built with. Replay their population so those labels follow the new language.
+            if (languageActuallyChanged)
+            {
+                try { ReplayPanelPopulationForLanguage(); }
+                catch (Exception ex) { Debug.LogWarning("[RMR Localize] panel replay failed: " + ex.Message); }
+            }
         }
 
         /// <summary>
@@ -4818,15 +4991,25 @@ namespace abcdcode_LOGLIKE_MOD
                 if (string.IsNullOrEmpty(raw))
                     return;
                 string lang = LogLikeMod.CanonicalizeLanguageTag(raw);
-                bool matches = !string.IsNullOrEmpty(_lastVanillaLocalizeLanguage)
+                bool bookkeepingMatches = !string.IsNullOrEmpty(_lastVanillaLocalizeLanguage)
                     && string.Equals(lang, _lastVanillaLocalizeLanguage, StringComparison.OrdinalIgnoreCase);
-                // Logged unconditionally: when a switch failed to re-sync there was no record at all
-                // of why, which made the whole thing unfalsifiable from a player's log.
-                // Sampled at display time, not just after a reload: if the reload logs OK and this
-                // logs MISMATCH, something between the two is overwriting the table.
+
+                // Trust the table, not the bookkeeping. Logs showed match=True next to a MISMATCH
+                // sample: RMR had recorded stamping the right language, yet the live table held the
+                // other one because something reloaded it after our pass finished. Reading what is
+                // actually in the table is the only trigger that catches that.
+                bool? tableCorrect = LogLikeMod.IsAbnormalityTableInLanguage(lang);
+                // The mod's own dictionary feeds compendium/reward page names, the vanilla table
+                // feeds the hover detail. Both must be checked or one stays stale while the other
+                // looks fine -- that is the "Chinese names, English description" split.
+                bool? modTextCorrect = LogLikeMod.IsModTextDictInLanguage(lang);
+                bool needsResync = !bookkeepingMatches || tableCorrect == false || modTextCorrect == false;
+
                 Debug.Log($"[RMR Localize] lang check: live='{raw}'->'{lang}' lastStamped='{_lastVanillaLocalizeLanguage ?? "none"}' "
-                    + $"match={matches} reason={reason} | {LogLikeMod.SampleAbnormalityTextScript(lang)}");
-                if (matches)
+                    + $"bookkeeping={bookkeepingMatches} table={(tableCorrect.HasValue ? tableCorrect.Value.ToString() : "unknown")} "
+                    + $"modText={(modTextCorrect.HasValue ? modTextCorrect.Value.ToString() : "unknown")} "
+                    + $"resync={needsResync} reason={reason} | {LogLikeMod.SampleAbnormalityTextScript(lang)}");
+                if (!needsResync)
                     return;
                 ApplyVanillaLocalizeForLanguage(raw, reason);
             }
@@ -5199,6 +5382,12 @@ namespace abcdcode_LOGLIKE_MOD
             __instance.PassiveListSelectable.SubmitEvent.RemoveAllListeners();
             if (!LogLikeRoutines.IsRoguelikeBattleSettingContext() || !LogueBookModels.playerModel.Contains(data))
                 return;
+            // Passive names here come from mod data that may have no translation for the current
+            // language, so they stay Chinese while the UI font is Latin-only and draw as 口口口
+            // ("9口口口" in the Passive Attribution list). Repair this panel once it is populated;
+            // the throttled scene-wide sweep does not cover a panel built this late.
+            try { LogLikeMod.RepairTmpFontsUnder(__instance.gameObject, "LibrarianInfoPanel.SetData"); }
+            catch { /* never block the prep screen */ }
             LogLikeRoutines.ForceUnlockBattleSettingLoadoutSlots(__instance);
             __instance.PassiveListSelectable.SubmitEvent.AddListener((UnityAction<BaseEventData>)(e => UIPassiveSuccessionPopup.Instance.SetData(data, (UIPassiveSuccessionPopup.ApplyEvent)(() =>
             {

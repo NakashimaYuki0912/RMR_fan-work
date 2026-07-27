@@ -40,23 +40,53 @@ namespace abcdcode_LOGLIKE_MOD_Extension
           Debug.LogError( "not supported Language");
           currentLanguage = "en";
         }
+        // Publish the new language BEFORE loading. Load() ends by calling LoadOthers, and RMR's
+        // LoadOthers postfix reads CurrentLanguage to decide which language to re-stamp vanilla
+        // tables with. Assigning afterwards meant that postfix still saw the PREVIOUS language, so
+        // the tables were rebuilt one switch behind -- English UI showing Chinese text and vice
+        // versa. It also starts out as the "kr" placeholder, which is not any real selection.
+        TextDataModel._currentLanguage = currentLanguage;
         if (!TextDataModel._isLoaded)
         {
           Singleton<LocalizedTextLoader>.Instance.Load(currentLanguage, ref TextDataModel._dic);
           TextDataModel._isLoaded = true;
         }
-        TextDataModel._currentLanguage = currentLanguage;
       }
 
       public static string GetText(string id, params object[] args)
       {
+        // Lazy load, but never from inside a text lookup that ran too early.
+        //
+        // LocalizedTextLoader.Load ends by calling LoadOthers, so this one line re-ran the game's
+        // ENTIRE localization just to resolve a single mod UI key. Worse, _currentLanguage starts as
+        // "kr", so an early GetText reloaded every vanilla table in Korean and RMR only re-stamped
+        // some of them back -- that is how reception and key-page group titles ended up Korean in an
+        // English game. Instance was also dereferenced unguarded, which throws during early init.
         if (!TextDataModel._isLoaded && !TextDataModel._yame)
         {
           TextDataModel._yame = true;
-          Singleton<LocalizedTextLoader>.Instance.Load(TextDataModel._currentLanguage, ref TextDataModel._dic);
+          try
+          {
+            LocalizedTextLoader loader = Singleton<LocalizedTextLoader>.Instance;
+            if (loader != null)
+            {
+              string lang = TextDataModel._currentLanguage;
+              if (string.IsNullOrEmpty(lang) || lang == "kr")
+              {
+                // Do not reload the world in the placeholder language; wait for LoadTextData.
+                lang = null;
+              }
+              if (lang != null)
+                loader.Load(lang, ref TextDataModel._dic);
+            }
+          }
+          catch
+          {
+            // A failed lazy load must not take down every caller of GetText.
+          }
         }
         string format;
-        if (!TextDataModel._dic.TryGetValue(id, out format))
+        if (TextDataModel._dic == null || !TextDataModel._dic.TryGetValue(id, out format))
           return string.Empty;
         format = format.Replace("\\n", "\n");
         if (format.Contains("[[") && format.Contains("]]"))

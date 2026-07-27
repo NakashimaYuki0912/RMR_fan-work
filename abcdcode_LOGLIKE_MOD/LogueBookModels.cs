@@ -1001,7 +1001,10 @@ namespace abcdcode_LOGLIKE_MOD
             }
             LogueBookModels.EnsureRemainStageListIntegrity();
             foreach (SaveData saveData in save.GetData("cardlist"))
-                LogueBookModels.AddCard(ExtensionUtils.LogLoadFromSaveData(saveData.GetData("id")), saveData.GetData("num").GetIntSelf(), false);
+                LogueBookModels.AddCard(
+                    RestoreSavedCombatCardForLoad(ExtensionUtils.LogLoadFromSaveData(saveData.GetData("id"))),
+                    saveData.GetData("num").GetIntSelf(),
+                    false);
             foreach (SaveData data3 in save.GetData("booklist"))
             {
                 BookModel model = LogueBookModels.LoadFromSaveData_BookModel(data3);
@@ -1017,6 +1020,34 @@ namespace abcdcode_LOGLIKE_MOD
             PruneInvalidPermanentAbnormalityCompendiumUnlocks();
             RMRAbnormalityUnlockManager.LoadRouteUnlocks(save.GetData("RMRAbnormalityUnlocks"));
             LogueBookModels.nextinstanceid = save.GetInt("nextinstanceid");
+        }
+
+        /// <summary>
+        /// Rebuilds a dynamic upgraded combat-page definition before a Continue Run restores it.
+        /// Upgrade IDs are persisted in the save, but their ItemXmlDataList entry exists only in
+        /// memory and is absent after restarting the game. AddCard intentionally ignores an ID it
+        /// cannot resolve, which previously made every saved upgraded page disappear on Continue.
+        /// </summary>
+        private static LorId RestoreSavedCombatCardForLoad(LorId savedId)
+        {
+            if (savedId == null || savedId == LorId.None)
+                return savedId;
+            if (!UpgradeMetadata.UnpackPid(savedId.packageId, out UpgradeMetadata metadata))
+                return savedId;
+
+            try
+            {
+                DiceCardXmlInfo restored = Singleton<LogCardUpgradeManager>.Instance.GetUpgradeCard(
+                    savedId.GetOriginalId(), metadata.index, metadata.count);
+                if (restored?.id != null)
+                    return restored.id;
+                Debug.LogError($"[RMR Save] Failed to rebuild saved upgraded combat page: {savedId.packageId}:{savedId.id}.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[RMR Save] Failed to rebuild saved upgraded combat page {savedId.packageId}:{savedId.id}: {ex.Message}");
+            }
+            return savedId;
         }
 
         private static void EnsureRemainStageListIntegrity()

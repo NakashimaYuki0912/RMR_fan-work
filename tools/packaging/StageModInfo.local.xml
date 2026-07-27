@@ -5,7 +5,9 @@
     <ID>abcdcodecalmmagma.LogueLikeReborn</ID>
     <!-- Shown in LoR's local Mods list after deploy_local.ps1. -->
     <Title>[LOCAL TEST] RMR REBORN fan work</Title>
-    <Description>[LOCAL TEST] 本机 Mods\RMR_REBORN_LOCAL 部署版本，不是 Steam Workshop 云端包。可与 Workshop 项同时显示，但测试时只能启用其中一个，避免重复加载。启动见接待界面右上角图标。</Description>
+    <!-- ASCII only. This string is NOT localized: the game shows it verbatim in every language, so
+         any CJK here renders as tofu boxes while testing under an English/Korean font. -->
+    <Description>[LOCAL TEST] Deployed to Mods\RMR_REBORN_LOCAL, not the Steam Workshop copy. Both entries can be listed at once, but enable only ONE of them or the mod loads twice. Start from the icon at the top right of the Reception screen.</Description>
     <Tag />
     <PreviewImage />
   </Workshop>

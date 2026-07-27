@@ -5,7 +5,9 @@
     <ID>abcdcodecalmmagma.LogueLikeReborn</ID>
     <!-- Public Workshop listing title (item 3743867841). Used by prepare_workshop_upload.ps1. -->
     <Title>RMR REBORN fan work [Workshop]</Title>
-    <Description>Steam Workshop 订阅包 (item 3743867841)。从接待界面右上角图标开始；书签继续游戏。Fan-maintained RMR — start via top-right Reception icon.</Description>
+    <!-- ASCII only. This string is NOT localized: the game shows it verbatim in every language, so
+         any CJK here renders as tofu boxes for players on an English/Korean font. -->
+    <Description>Fan-maintained RogueLike Mod REBORN (Workshop item 3743867841). Start from the icon at the top right of the Reception screen; use Continue in that menu to resume a run.</Description>
     <Tag />
     <PreviewImage />
   </Workshop>

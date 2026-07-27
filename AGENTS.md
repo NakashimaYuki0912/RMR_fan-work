@@ -302,20 +302,36 @@ powershell -ExecutionPolicy Bypass -File .\tools\packaging\pack_mod.ps1   # 可�
 
 ---
 
-## 10. 2026-07-12 交接快照（随 HANDOFF 更新）
+## 10. 2026-07-27 交接快照（随 HANDOFF 更新）
 
 | 项 | 状态 |
 |---|---|
-| 最新源码 Build 戳 | `2026-07-12Tfix-cjk-sharp-sweep+08:00`（以 `RMR_Core.cs` 为准） |
-| 已部署 Workshop | 是（以本机 `deploy_workshop` 与 DLL 时间为准） |
-| Git | `main`，曾 commit `3291d33`；CJK 全扫可能仍有未提交改动——**以 `git status` 为准** |
-| 情感层过滤 | 已修 |
-| 商店/神秘软锁 | 已修 |
-| Hub / 选层 / 图鉴字体 | 已修 |
-| 空库存提示 | 已删（静默） |
-| Steam 上传 | Agent **不能**代登；用户自行 Workshop 更新 |
+| 最新源码 Build 戳 | `2026-07-27Tcontinue-deck-restore-fix+08:00`（以 `RMR_Core.cs` 为准） |
+| Workshop | **已发布** item 3743867841（2026-07-27，91.40 MB） |
+| GitHub | 已推送，远端已迁移到 `NakashimaYuki0912/RMR_fan-work.git` |
+| Git | `main`，工作树干净——**仍以 `git status` 为准** |
+| 存档续玩 | **已修**：读档隔离 + 写盘守卫 + 牌组恢复跳过楼层上限检查 |
+| 异想体战斗节点 | **已修**：补回 `e998173` 误删的占位 Stage |
+| 苍蓝残响 / Roland 解锁 | **已修**：改为按 TextId 解析，不再硬编码 |
+| 中文清晰度 | **已修**：移除强制 `extraPadding` |
+| 启动 / 奖励界面卡顿 | **已修**：美术索引化、缩略图缓存、字体修复改局部（启动 15s→6s） |
+| 源码编码污染 | **已清**：全仓字节级 UTF-8 校验通过 |
+| 语言切换文本残留 | ❌ **未修**，已埋探针 |
+| Localization Manager 冲突 | ❌ **未修**，根因已定位 |
+| Steam 上传 | 本机 steamcmd 用**缓存凭据**，当前无需密码；凭据失效则需人工交互 |
 
-详细修复表：`docs/agent-handbook/04-known-bugs-and-fixes.md`。
+详细修复表：`docs/agent-handbook/04-known-bugs-and-fixes.md`，完整交接见 `docs/HANDOFF.md`。
+
+### 10.1 本机部署目标（易错）
+
+**日常实测用 `deploy_local.ps1`**（→ `Mods\RMR_REBORN_LOCAL`），那才是 Player.log 实际加载的。
+`deploy_workshop.ps1` 只在准备上传时用。两者 ModId 相同，Mod 列表里**只能启用一个**。
+
+### 10.2 打包上传陷阱（2026-07-27 已修）
+
+- 描述抓取会带入商店页评论区 JavaScript，导致 steamcmd `KeyValues Error: got } in key` 拒绝解析。
+- Steam 的 KeyValues **不认 `\"` 转义**——裸引号即终止字符串。写 VDF 校验器必须照此实现。
+- `prepare_workshop_upload.ps1` 需排除 `*.old`，否则旧 DLL 会一起发给订阅者。
 
 ---
 

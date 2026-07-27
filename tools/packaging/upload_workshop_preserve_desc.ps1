@@ -54,6 +54,20 @@ function Convert-SteamDescHtml([string]$htmlDesc) {
         $cut = $s.IndexOf($noise)
         if ($cut -ge 0) { $s = $s.Substring(0, $cut).Trim() }
     }
+    # The description block on the page is followed by the comment-thread bootstrap script. Its
+    # nested escaped quotes and braces are valid text but NOT valid KeyValues, and steamcmd dies with
+    # "RecursiveLoadFromBuffer: got } in key ... Failed to parse build config file".
+    # Cut at the first script marker, then fall back to the last legitimate BBCode close tag.
+    foreach ($marker in @('$J(', 'InitializeCommentThread', 'g_rgCommentThreadInfo', '"contributors"', '\"contributors\"')) {
+        $cut = $s.IndexOf($marker)
+        if ($cut -ge 0) { $s = $s.Substring(0, $cut).Trim() }
+    }
+    $lastClose = -1
+    foreach ($tag in @('[/list]', '[/url]', '[/b]', '[/i]', '[/h2]', '[/h1]')) {
+        $idx = $s.LastIndexOf($tag)
+        if ($idx -ge 0 -and ($idx + $tag.Length) -gt $lastClose) { $lastClose = $idx + $tag.Length }
+    }
+    if ($lastClose -gt 80) { $s = $s.Substring(0, $lastClose) }
     # unwrap steam linkfilter
     $s = [regex]::Replace($s, '\[url=https://steamcommunity\.com/linkfilter/\?u=([^\]]+)\]', {
         param($m)
@@ -166,6 +180,41 @@ $vdf = @"
 "@
 [IO.File]::WriteAllText($vdfPath, $vdf, [Text.UTF8Encoding]::new($false))
 Write-Host "VDF written (description preserved from live page): $vdfPath" -ForegroundColor Cyan
+
+# Parse the VDF the way steamcmd's KeyValues reader does BEFORE spending a login round-trip on it.
+# A scraped description that smuggles in page JavaScript produces a file that looks fine but makes
+# steamcmd abort with "Failed to parse build config file" after it has already logged in.
+function Assert-VdfParses([string]$path) {
+    $text = [IO.File]::ReadAllText($path)
+    # Steam's KeyValues reader does NOT honour \" inside a quoted string the way JSON does: a
+    # backslash is literal and the next '"' ends the value. A scraped description carrying page
+    # JSON (\"contributors\":[...]) therefore terminates early, and everything after it is read as
+    # keys/braces -- which is exactly the "got } in key" abort. Mirror that rule here, or this check
+    # happily passes files steamcmd rejects.
+    $i = 0; $n = $text.Length; $tokens = New-Object System.Collections.ArrayList
+    while ($i -lt $n) {
+        $c = $text[$i]
+        if ($c -eq ' ' -or $c -eq "`t" -or $c -eq "`r" -or $c -eq "`n") { $i++; continue }
+        if ($c -eq '"') {
+            $i++; $start = $i
+            while ($i -lt $n -and $text[$i] -ne '"') { $i++ }
+            if ($i -ge $n) { throw "VDF parse check failed: unterminated string starting at offset $start" }
+            $i++
+            [void]$tokens.Add('STR'); continue
+        }
+        if ($c -eq '{' -or $c -eq '}') { [void]$tokens.Add($c.ToString()); $i++; continue }
+        $ctxStart = [Math]::Max(0, $i - 60)
+        throw "VDF parse check failed: stray '$c' at offset $i -- a value likely ended early on an unescaped quote. Context: $($text.Substring($ctxStart, [Math]::Min(120, $n - $ctxStart)))"
+    }
+    if ($tokens.Count -lt 4) { throw "VDF parse check failed: too few tokens" }
+    if ($tokens[0] -ne 'STR' -or $tokens[1] -ne '{' -or $tokens[$tokens.Count-1] -ne '}') {
+        throw "VDF parse check failed: unexpected top-level shape (a value ended early and swallowed the structure)"
+    }
+    $body = $tokens.Count - 3
+    if ($body % 2 -ne 0) { throw "VDF parse check failed: odd key/value count (a string is unterminated)" }
+    Write-Host "  VDF parse check OK ($($body/2) key/value pairs)" -ForegroundColor Green
+}
+Assert-VdfParses $vdfPath
 
 $steamcmd = @("E:\Steam\steamcmd\steamcmd.exe", "E:\Steam\steamcmd.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $steamcmd) { throw "steamcmd not found" }

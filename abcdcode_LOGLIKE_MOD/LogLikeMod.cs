@@ -1334,13 +1334,39 @@ namespace abcdcode_LOGLIKE_MOD
         {
             if (LogLikeMod.LogMods != null)
                 return LogLikeMod.LogMods;
-            LogLikeMod.LogMods = new List<ModContentInfo>();
-            foreach (ModContentInfo allMod in Singleton<ModContentManager>.Instance.GetAllMods())
+
+            // Never cache a failed or empty scan. This runs during localization load, which other
+            // localization mods can trigger before ModContentManager is populated; caching the empty
+            // result there left RMR believing no companion mods existed for the whole session.
+            var found = new List<ModContentInfo>();
+            try
             {
-                if (allMod.activated && Directory.Exists(allMod.GetLogDllPath()))
-                    LogLikeMod.LogMods.Add(allMod);
+                ModContentManager manager = Singleton<ModContentManager>.Instance;
+                if (manager == null)
+                    return found;
+                List<ModContentInfo> all = manager.GetAllMods();
+                if (all == null)
+                    return found;
+                foreach (ModContentInfo allMod in all)
+                {
+                    try
+                    {
+                        // Framework-loaded mods can have a null invInfo/workshopInfo chain.
+                        if (allMod != null && allMod.activated && Directory.Exists(allMod.GetLogDllPath()))
+                            found.Add(allMod);
+                    }
+                    catch { /* skip a mod entry that cannot describe itself */ }
+                }
             }
-            return LogLikeMod.LogMods;
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR] GetLogMods scan failed (not cached, will retry): " + ex.Message);
+                return found;
+            }
+
+            if (found.Count > 0)
+                LogLikeMod.LogMods = found;
+            return found;
         }
 
         public static Sprite GetArtWorks(DirectoryInfo dir, string name)
@@ -3143,6 +3169,9 @@ namespace abcdcode_LOGLIKE_MOD
 
         private static bool RefreshingVanillaBookAndPassiveLocalize;
 
+        /// <summary>Language of the last book/passive pass that also swept the scene for fonts.</summary>
+        private static string _lastBookPassiveRepairLanguage;
+
         /// <summary>
         /// Key-page names / story / passives. Vanilla LoadPassiveDesc CLEARS the whole
         /// PassiveDesc dictionary (wiping mod entries). Reload origin CN, then re-apply mod
@@ -3170,7 +3199,13 @@ namespace abcdcode_LOGLIKE_MOD
 
                 // LoadPassiveDesc clears mod package keys — put them back and stamp PassiveXmlInfo.
                 ReloadModBookAndPassiveLocalize(language);
-                EnsureLocalizedFonts("RefreshBookPassive:" + reason, repairActiveUi: true);
+                // Only sweep the scene when the language actually changed. This runs on every
+                // Invitation.OpenInit / StartHub.Show, and each sweep is a full-scene
+                // FindObjectsOfType that re-assigned the same font to 200+ labels -- eleven of them
+                // in one session, which is what made loading feel sluggish.
+                bool languageChanged = !string.Equals(language, _lastBookPassiveRepairLanguage, StringComparison.OrdinalIgnoreCase);
+                EnsureLocalizedFonts("RefreshBookPassive:" + reason, repairActiveUi: languageChanged);
+                _lastBookPassiveRepairLanguage = language;
                 Debug.Log($"[RMR Localize] Refreshed book/passive localize language={language} reason={reason}.");
             }
             catch (Exception e)
@@ -3387,6 +3422,116 @@ namespace abcdcode_LOGLIKE_MOD
         /// is visible in Player.log instead of only on screen. Returns e.g.
         /// "sample id=bloodbath cjk=0 hangul=0 latin=42 expect=en MISMATCH".
         /// </summary>
+        /// <summary>
+        /// Does the live vanilla abnormality table actually hold text in <paramref name="language"/>?
+        /// null when it cannot be determined (table missing or empty).
+        ///
+        /// Bookkeeping alone is not enough: logs showed "lang check ... match=True" while the very
+        /// same sample reported MISMATCH -- RMR believed it had stamped the right language, but
+        /// something re-loaded the table afterwards. Reading the data is the only reliable trigger.
+        /// </summary>
+        public static bool? IsAbnormalityTableInLanguage(string language)
+        {
+            try
+            {
+                string text = GetAbnormalityTableSampleText(out string _);
+                if (string.IsNullOrEmpty(text))
+                    return null;
+                int cjk = 0, hangul = 0, latin = 0;
+                CountScripts(text, out cjk, out hangul, out latin);
+                string lang = CanonicalizeTextLanguage(language);
+                if (lang == "cn" || lang == "trcn")
+                    return cjk > 0;
+                if (lang == "kr")
+                    return hangul > 0;
+                if (lang == "jp")
+                    return cjk > 0 || hangul > 0;
+                return latin > 0 && cjk == 0 && hangul == 0;   // en
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Is RMR's own text dictionary actually holding <paramref name="language"/>?
+        /// null when it cannot be determined.
+        ///
+        /// Separate from the vanilla abnormality table on purpose: the compendium and reward UIs read
+        /// page names through Extension.TextDataModel.GetText, while the hover detail comes from the
+        /// vanilla table. Watching only one of them produced exactly the reported split -- Chinese
+        /// names in the list next to an English description in the preview.
+        /// </summary>
+        public static bool? IsModTextDictInLanguage(string language)
+        {
+            try
+            {
+                var dict = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.textDic;
+                if (dict == null || dict.Count == 0)
+                    return null;
+                // Sample several entries: a single key may legitimately be ASCII in every language.
+                int cjk = 0, hangul = 0, latin = 0, sampled = 0;
+                foreach (var kv in dict)
+                {
+                    if (string.IsNullOrEmpty(kv.Value))
+                        continue;
+                    int c, h, l;
+                    CountScripts(kv.Value, out c, out h, out l);
+                    cjk += c; hangul += h; latin += l;
+                    if (++sampled >= 60)
+                        break;
+                }
+                if (sampled == 0 || (cjk + hangul + latin) == 0)
+                    return null;
+                string lang = CanonicalizeTextLanguage(language);
+                if (lang == "cn" || lang == "trcn")
+                    return cjk > 0;
+                if (lang == "kr")
+                    return hangul > 0;
+                if (lang == "jp")
+                    return cjk > 0 || hangul > 0;
+                return cjk == 0 && hangul == 0;   // en: no CJK at all
+            }
+            catch { return null; }
+        }
+
+        private static void CountScripts(string text, out int cjk, out int hangul, out int latin)
+        {
+            cjk = 0; hangul = 0; latin = 0;
+            foreach (char c in text)
+            {
+                if (c >= '一' && c <= '鿿') cjk++;
+                else if (c >= '가' && c <= '힯') hangul++;
+                else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) latin++;
+            }
+        }
+
+        /// <summary>First usable ability/name string in the vanilla abnormality table.</summary>
+        private static string GetAbnormalityTableSampleText(out string sampleId)
+        {
+            sampleId = null;
+            AbnormalityCardDescXmlList list = Singleton<AbnormalityCardDescXmlList>.Instance;
+            if (list == null)
+                return null;
+            var dict = typeof(AbnormalityCardDescXmlList)
+                .GetField("_dictionary", AccessTools.all)?.GetValue(list)
+                as System.Collections.IDictionary;
+            if (dict == null || dict.Count == 0)
+                return null;
+            foreach (System.Collections.DictionaryEntry entry in dict)
+            {
+                AbnormalityCard card = entry.Value as AbnormalityCard;
+                if (card == null)
+                    continue;
+                string candidate = card.abilityDesc;
+                if (string.IsNullOrEmpty(candidate))
+                    candidate = card.cardName;
+                if (string.IsNullOrEmpty(candidate) || candidate == "Not found")
+                    continue;
+                sampleId = entry.Key as string;
+                return candidate;
+            }
+            return null;
+        }
+
         public static string SampleAbnormalityTextScript(string language)
         {
             try
