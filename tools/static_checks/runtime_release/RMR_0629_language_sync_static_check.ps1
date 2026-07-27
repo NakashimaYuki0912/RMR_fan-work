@@ -17,9 +17,13 @@ function AssertNotContains($name, $text, $needle) { if ($text.Contains($needle))
 
 $logLike = ReadText 'abcdcode_LOGLIKE_MOD\LogLikeMod.cs'
 $patches = ReadText 'abcdcode_Refactored\LogLikePatches.cs'
+$extensionText = ReadText 'abcdcode_LOGLIKE_MOD_Extension\TextDataModel.cs'
 
 AssertContains 'extension text dictionary cleared before localized reload' $logLike 'TextDataModel.textDic.Clear()'
 AssertContains 'extension text model marked loaded to prevent stale vanilla lazy-load' $logLike 'TextDataModel._isLoaded = true'
+AssertContains 'extension text initialization uses RMR duplicate-tolerant loader' $extensionText 'global::abcdcode_LOGLIKE_MOD.LogLikeMod.LoadTextData(currentLanguage);'
+AssertNotContains 'extension text initialization must not feed its dictionary into vanilla localization loader' $extensionText 'Load(currentLanguage, ref TextDataModel._dic)'
+AssertNotContains 'extension text lazy load must not feed its dictionary into vanilla localization loader' $extensionText 'loader.Load(lang, ref TextDataModel._dic)'
 AssertContains 'game language separated from mod localization fallback' $logLike 'ResolveModLocalizeLanguage(language)'
 $resolver = [regex]::Match($logLike, 'private static string ResolveInitialTextLanguage\(\)\s*\{(?<body>[\s\S]*?)\n\s*\}\s*\n\s*private static string NormalizeTextLanguage')
 if (-not $resolver.Success) { throw 'Could not isolate ResolveInitialTextLanguage.' }

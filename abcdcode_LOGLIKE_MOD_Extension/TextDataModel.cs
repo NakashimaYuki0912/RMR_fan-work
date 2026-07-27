@@ -40,16 +40,20 @@ namespace abcdcode_LOGLIKE_MOD_Extension
           Debug.LogError( "not supported Language");
           currentLanguage = "en";
         }
-        // Publish the new language BEFORE loading. Load() ends by calling LoadOthers, and RMR's
-        // LoadOthers postfix reads CurrentLanguage to decide which language to re-stamp vanilla
-        // tables with. Assigning afterwards meant that postfix still saw the PREVIOUS language, so
-        // the tables were rebuilt one switch behind -- English UI showing Chinese text and vice
-        // versa. It also starts out as the "kr" placeholder, which is not any real selection.
+        // Publish the new language before loading so all RMR consumers observe one coherent state.
         TextDataModel._currentLanguage = currentLanguage;
-        if (!TextDataModel._isLoaded)
+        try
         {
-          Singleton<LocalizedTextLoader>.Instance.Load(currentLanguage, ref TextDataModel._dic);
-          TextDataModel._isLoaded = true;
+          // This dictionary belongs to RMR. Passing it to the vanilla full localization loader made
+          // every duplicate vanilla UI key throw Dictionary.Add exceptions during language reloads
+          // (thousands per switch), creating visible stalls. RMR's loader intentionally overwrites
+          // duplicate mod keys and never reloads the global vanilla tables.
+          global::abcdcode_LOGLIKE_MOD.LogLikeMod.LoadTextData(currentLanguage);
+        }
+        catch (Exception ex)
+        {
+          Debug.LogWarning("[RMR Localize] InitTextData failed: " + ex.Message);
+          TextDataModel._isLoaded = false;
         }
       }
 
@@ -67,18 +71,14 @@ namespace abcdcode_LOGLIKE_MOD_Extension
           TextDataModel._yame = true;
           try
           {
-            LocalizedTextLoader loader = Singleton<LocalizedTextLoader>.Instance;
-            if (loader != null)
+            string lang = TextDataModel._currentLanguage;
+            if (string.IsNullOrEmpty(lang) || lang == "kr")
             {
-              string lang = TextDataModel._currentLanguage;
-              if (string.IsNullOrEmpty(lang) || lang == "kr")
-              {
-                // Do not reload the world in the placeholder language; wait for LoadTextData.
-                lang = null;
-              }
-              if (lang != null)
-                loader.Load(lang, ref TextDataModel._dic);
+              // Do not reload the world in the placeholder language; wait for LoadTextData.
+              lang = null;
             }
+            if (lang != null)
+              global::abcdcode_LOGLIKE_MOD.LogLikeMod.LoadTextData(lang);
           }
           catch
           {

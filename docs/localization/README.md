@@ -5,8 +5,10 @@ This folder is the **source of truth for translators and developers** working on
 | Doc | Audience | Purpose |
 |-----|----------|---------|
 | [TRANSLATOR_GUIDE_EN.md](TRANSLATOR_GUIDE_EN.md) | English (and other) translators | How to edit strings, file map, workflow, QA |
+| [TRANSLATION_WORKFLOW.md](TRANSLATION_WORKFLOW.md) | All translators | Task routing for events, pages, passives and descriptions; safe edit and QA workflow |
 | [GLOSSARY.md](GLOSSARY.md) | All languages | Canonical terms (CN / EN / KR) — **use these names** |
-| [FILE_MAP.md](FILE_MAP.md) | Translators + coders | Which folder/file holds which content |`r`n| [CODE_TERMINOLOGY.md](CODE_TERMINOLOGY.md) | **Developers** | C# name map (Compendium vs disk keys vs Lastest) |
+| [FILE_MAP.md](FILE_MAP.md) | Translators + coders | Which folder/file holds which content |
+| [CODE_TERMINOLOGY.md](CODE_TERMINOLOGY.md) | Developers | C# name map (Compendium vs disk keys vs Lastest) |
 | [../agent-handbook/01-localization-fonts.md](../agent-handbook/01-localization-fonts.md) | Developers | Fonts, tofu, encoding accidents |
 
 Game data path (repo):
@@ -30,7 +32,7 @@ Workshop content item (author): `3743867841`
 3. **Never rename `id="..."` keys** — only change text between tags.
 4. Save as **UTF-8** (no GBK/ANSI).
 5. Keep the same relative path/filename as `cn/` and `en/` when possible.
-6. After editing, ask a developer to copy `Localize/` into the Workshop deploy tree and restart the game.
+6. Run `tools/localization/validate_localization.ps1`, then ask a developer to deploy `Localize/` and restart the game.
 
 ---
 
