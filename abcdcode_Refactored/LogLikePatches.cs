@@ -4852,6 +4852,7 @@ namespace abcdcode_LOGLIKE_MOD
         /// </summary>
         private static void ReplayPanelPopulationForLanguage()
         {
+            bool abnormalityPanelReplayed = false;
             try
             {
                 if (_lastAbnormalityPanel != null
@@ -4860,6 +4861,7 @@ namespace abcdcode_LOGLIKE_MOD
                     && _lastAbnormalityPanel.gameObject.activeInHierarchy)
                 {
                     _lastAbnormalityPanel.SetData(_lastAbnormalityPanelFloor);
+                    abnormalityPanelReplayed = true;
                 }
             }
             catch (Exception ex)
@@ -4885,8 +4887,8 @@ namespace abcdcode_LOGLIKE_MOD
                 }
                 catch { /* one bad slot must not stop the rest */ }
             }
-            if (slots > 0)
-                Debug.Log($"[RMR Localize] Replayed panel population for {slots} character slot(s) after a language change.");
+            Debug.Log($"[RMR Localize] Replayed panel population after localization refresh: "
+                + $"abnormalityPanel={abnormalityPanelReplayed}, characterSlots={slots}.");
         }
 
         #endregion
@@ -4963,16 +4965,15 @@ namespace abcdcode_LOGLIKE_MOD
             // Store canonical: vanilla passes several spellings for one language, and comparing a raw
             // parameter against a live lookup made the catch-up below think nothing had changed.
             string canonical = LogLikeMod.CanonicalizeLanguageTag(language);
-            bool languageActuallyChanged = !string.Equals(canonical, _lastVanillaLocalizeLanguage, StringComparison.OrdinalIgnoreCase);
             _lastVanillaLocalizeLanguage = canonical;
 
             // Tables are correct now, but panels already on screen still show the strings they were
-            // built with. Replay their population so those labels follow the new language.
-            if (languageActuallyChanged)
-            {
-                try { ReplayPanelPopulationForLanguage(); }
-                catch (Exception ex) { Debug.LogWarning("[RMR Localize] panel replay failed: " + ex.Message); }
-            }
+            // built with. Rebuild them after every full localization pass, not only when the language
+            // string changed: another localization loader can overwrite the tables in-place while the
+            // selected language remains the same. In that case a table resync without this replay left
+            // list labels in the previous language while hover text (which reads the table live) was new.
+            try { ReplayPanelPopulationForLanguage(); }
+            catch (Exception ex) { Debug.LogWarning("[RMR Localize] panel replay failed: " + ex.Message); }
         }
 
         /// <summary>

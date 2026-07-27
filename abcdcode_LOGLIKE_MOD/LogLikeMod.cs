@@ -2512,11 +2512,9 @@ namespace abcdcode_LOGLIKE_MOD
 
         private static string ResolveInitialTextLanguage()
         {
-            string optionLanguage = TryReadLanguageFromOptionFile();
-            if (!string.IsNullOrEmpty(optionLanguage))
-                return optionLanguage;
-
-            // Prefer live LocalizedTextLoader language when available (more accurate mid-session).
+            // Prefer the live language while the game is running. option.dat can lag one language
+            // change behind, so reading it first made newly populated character descriptions choose
+            // the previous language's TMP face after the first in-session switch.
             try
             {
                 LocalizedTextLoader loader = Singleton<LocalizedTextLoader>.Instance;
@@ -2529,9 +2527,19 @@ namespace abcdcode_LOGLIKE_MOD
             }
             catch { /* ignore */ }
 
-            string current = CanonicalizeTextLanguage(TextDataModel.CurrentLanguage);
-            if (!string.IsNullOrEmpty(current) && TextDataModel.GetSupportedLangs().Contains(current) && current != "kr")
-                return current;
+            try
+            {
+                string current = CanonicalizeTextLanguage(TextDataModel.CurrentLanguage);
+                if (TextDataModel._isLoaded
+                    && !string.IsNullOrEmpty(current)
+                    && TextDataModel.GetSupportedLangs().Contains(current))
+                    return current;
+            }
+            catch { /* ignore */ }
+
+            string optionLanguage = TryReadLanguageFromOptionFile();
+            if (!string.IsNullOrEmpty(optionLanguage))
+                return optionLanguage;
 
             switch (Application.systemLanguage)
             {
@@ -2550,15 +2558,11 @@ namespace abcdcode_LOGLIKE_MOD
 
         private static string NormalizeTextLanguage(string language)
         {
-            string optionLanguage = TryReadLanguageFromOptionFile();
-            if (!string.IsNullOrEmpty(optionLanguage))
-                return optionLanguage;
-
             language = CanonicalizeTextLanguage(language);
-            if (string.IsNullOrEmpty(language) || !TextDataModel.GetSupportedLangs().Contains(language))
-                return ResolveInitialTextLanguage();
+            if (!string.IsNullOrEmpty(language) && TextDataModel.GetSupportedLangs().Contains(language))
+                return language;
 
-            return language;
+            return ResolveInitialTextLanguage();
         }
 
         private static string CanonicalizeTextLanguage(string language)

@@ -538,7 +538,11 @@ namespace abcdcode_LOGLIKE_MOD
             {
                 foreach (SaveData data8 in data7)
                 {
-                    LorId cardId = ExtensionUtils.LogLoadFromSaveData(data8);
+                    // A saved upgraded card uses a dynamic <LogUpgrade> package id. Rebuild it
+                    // before adding it to the unit deck, just as the run inventory loader does;
+                    // otherwise the inventory later contains the card but this deck entry was
+                    // skipped while the dynamic XML definition did not yet exist.
+                    LorId cardId = RestoreSavedCombatCardForLoad(ExtensionUtils.LogLoadFromSaveData(data8));
                     model.Log($"INITIALIZING DECK FOR UNIT : {cardId.packageId}, {cardId.id.ToString()}");
                     LogueBookModels.AddCard(cardId, 1, false);
                     int num2 = (int)model.unitData.AddCardFromInventory(cardId);

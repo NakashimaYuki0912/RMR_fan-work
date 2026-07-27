@@ -21,5 +21,8 @@ if ($text -notmatch 'GetUpgradeCard\s*\(\s*savedId\.GetOriginalId\(\)\s*,\s*meta
 if ($text -notmatch 'AddCard\s*\(\s*RestoreSavedCombatCardForLoad\s*\(') {
     throw 'Continue inventory loading does not restore dynamic upgraded IDs before AddCard.'
 }
+if ($text -notmatch 'LorId\s+cardId\s*=\s*RestoreSavedCombatCardForLoad\s*\(\s*ExtensionUtils\.LogLoadFromSaveData\s*\(\s*data8\s*\)\s*\)\s*;') {
+    throw 'Continue librarian-deck loading does not rebuild dynamic upgraded IDs before AddCardFromInventory.'
+}
 
 'RMR UPGRADED CARD CONTINUE RESTORE STATIC CHECK PASSED'
