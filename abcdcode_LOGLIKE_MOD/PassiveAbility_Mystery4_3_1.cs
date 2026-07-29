@@ -31,6 +31,8 @@ public class PassiveAbility_Mystery4_3_1 : PassiveAbilityBase
     ++this.round;
     if (this.round <= 3 || PassiveAbility_Mystery4_3_1.Ended)
       return;
+    try { RewardingModel.MarkNonCombatNodeExit("MysteryThreeRoundTimer"); }
+    catch (Exception ex) { UnityEngine.Debug.LogWarning("[RMR] MysteryThreeRoundTimer exit marker: " + ex.Message); }
     Singleton<StageController>.Instance.GetStageModel().GetWave(Singleton<StageController>.Instance.CurrentWave).Defeat();
     Singleton<StageController>.Instance.EndBattle();
     PassiveAbility_Mystery4_3_1.Ended = true;

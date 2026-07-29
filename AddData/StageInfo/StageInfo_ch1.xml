@@ -8,7 +8,7 @@
       <Unit>854</Unit>
     </Wave>
     <Name>Roguelike Reborn</Name>
-    <FloorNum>10</FloorNum>
+    <FloorNum>1</FloorNum>
     <Invitation Combine="BookRecipe">
     <Book>-853</Book> 
       
@@ -24,7 +24,7 @@
     </Wave> 
 
     <Name>Roguelike Classic</Name>
-    <FloorNum>10</FloorNum>
+    <FloorNum>1</FloorNum>
     <Invitation Combine="BookRecipe">
      <Book>-854</Book> 
       
@@ -38,7 +38,7 @@
      <Unit>854</Unit>
     </Wave>
     <Name>Roguelike</Name>
-    <FloorNum>10</FloorNum>
+    <FloorNum>1</FloorNum>
     <Invitation Combine="BookRecipe">
      <Book>-855</Book> 
       
@@ -52,7 +52,7 @@
      <Unit>854</Unit>
     </Wave>
     <Name> </Name>
-    <FloorNum>10</FloorNum>
+    <FloorNum>1</FloorNum>
     <Invitation Combine="BookRecipe">
      <Book>-2854</Book> 
       
@@ -65,7 +65,7 @@
      <Unit>854</Unit>
     </Wave>
     <Name> </Name>
-    <FloorNum>10</FloorNum>
+    <FloorNum>1</FloorNum>
     <Invitation Combine="BookRecipe">
      <Book>-3854</Book> 
       
@@ -78,7 +78,7 @@
      <Unit>854</Unit>
     </Wave>
     <Name> </Name>
-    <FloorNum>10</FloorNum>
+    <FloorNum>1</FloorNum>
     <Invitation Combine="BookRecipe">
      <Book>-4854</Book> 
       
@@ -92,7 +92,7 @@
     <Unit>855</Unit>
     </Wave>
     <Name> </Name>
-    <FloorNum>10</FloorNum>
+    <FloorNum>1</FloorNum>
     <Invitation Combine="BookRecipe">
      <Book>-5854</Book> 
       
@@ -107,7 +107,7 @@
     <Unit>855</Unit>
     </Wave>
     <Name> </Name>
-    <FloorNum>10</FloorNum>
+    <FloorNum>1</FloorNum>
     <Invitation Combine="BookRecipe">
      <Book>-6854</Book> 
       
@@ -122,7 +122,7 @@
     <Unit>855</Unit>
     </Wave>
     <Name> </Name>
-    <FloorNum>10</FloorNum>
+    <FloorNum>1</FloorNum>
     <Invitation Combine="BookRecipe">
      <Book>-7854</Book> 
       

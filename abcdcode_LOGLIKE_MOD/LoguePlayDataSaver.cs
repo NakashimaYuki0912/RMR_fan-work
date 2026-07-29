@@ -26,6 +26,7 @@ namespace abcdcode_LOGLIKE_MOD
     {
         /// <summary>Save format version. Mismatch → CheckPlayerData returns false.</summary>
         public static string version = "4.8";
+        public static bool RunDefeatPending { get; private set; }
 
         #region --- Debug / chapter bootstrap ---
 
@@ -102,7 +103,16 @@ namespace abcdcode_LOGLIKE_MOD
         {
             // A fresh run is starting, so there is no longer a good snapshot to protect.
             LastLoadFailed = false;
+            RunDefeatPending = false;
             Singleton<LogueSaveManager>.Instance.RemoveData("Lastest");
+        }
+
+        public static void MarkRunDefeated(string reason)
+        {
+            RunDefeatPending = true;
+            LastLoadFailed = false;
+            Singleton<LogueSaveManager>.Instance.RemoveData("Lastest");
+            Debug.Log($"[RMR Save] Run defeated; Lastest removed and snapshot writes blocked ({reason}).");
         }
 
         /// <summary>
@@ -112,6 +122,11 @@ namespace abcdcode_LOGLIKE_MOD
         /// </summary>
         private static bool ShouldRefuseSnapshotWrite(string reason)
         {
+            if (RunDefeatPending)
+            {
+                Debug.LogWarning($"[RMR Save] Refusing to write Lastest ({reason}): this run has already ended in defeat.");
+                return true;
+            }
             if (LastLoadFailed)
             {
                 Debug.LogError($"[RMR Save] Refusing to write Lastest ({reason}): the last LoadPlayData failed, so the in-memory run is incomplete. The existing save file is left untouched.");
@@ -281,6 +296,23 @@ namespace abcdcode_LOGLIKE_MOD
 
         #region --- Continue eligibility (Start Hub) ---
 
+        private static bool SavedPartyHasLivingMember(SaveData save)
+        {
+            SaveData bookData = save?.GetData("LogueBookModel");
+            SaveData partyData = bookData?.GetData("playerBattleModel");
+            if (partyData == null)
+                return false;
+
+            foreach (SaveData unit in partyData)
+            {
+                if (unit == null)
+                    continue;
+                if (unit.GetInt("isDead") == 0 && unit.GetInt("hp") > 0)
+                    return true;
+            }
+            return false;
+        }
+
         /// <summary>
         /// Returns true if Continue Run should be offered on the start hub.
         /// Requires a valid <c>Lastest</c> file and matching save version.
@@ -296,6 +328,12 @@ namespace abcdcode_LOGLIKE_MOD
                 if (saveData1.GetString("version") != LoguePlayDataSaver.version)
                 {
                     Debug.LogWarning($"[RMR] CheckPlayerData: version mismatch (save={saveData1.GetString("version")}, need={LoguePlayDataSaver.version}).");
+                    return false;
+                }
+                if (!SavedPartyHasLivingMember(saveData1))
+                {
+                    Debug.LogWarning("[RMR] CheckPlayerData: saved party has no living librarians; deleting failed run.");
+                    Singleton<LogueSaveManager>.Instance.RemoveData("Lastest");
                     return false;
                 }
 

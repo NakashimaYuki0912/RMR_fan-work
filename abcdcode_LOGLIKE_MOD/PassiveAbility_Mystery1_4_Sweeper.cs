@@ -20,6 +20,8 @@ namespace abcdcode_LOGLIKE_MOD
             ++this.round;
             if (this.round <= 3)
                 return;
+            try { RewardingModel.MarkNonCombatNodeExit("MysterySweeperTimer"); }
+            catch (System.Exception ex) { UnityEngine.Debug.LogWarning("[RMR] MysterySweeperTimer exit marker: " + ex.Message); }
             Singleton<StageController>.Instance.GetStageModel().GetWave(Singleton<StageController>.Instance.CurrentWave).Defeat();
             Singleton<StageController>.Instance.EndBattle();
         }

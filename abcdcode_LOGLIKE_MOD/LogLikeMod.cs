@@ -258,25 +258,11 @@ namespace abcdcode_LOGLIKE_MOD
                 else
                     stageWaveModelList.Add(stageWaveModel);
             }
-            // MapInfo must come ONLY from the stage being entered.
-            // Do NOT inherit previous ClassInfo.mapInfo — that kept BlackSilence/Ensemble maps
-            // (or empty Malkuth defaults) stuck across impurity stages.
-            if (stageModel.ClassInfo != null)
-            {
-                if (data.mapInfo != null && data.mapInfo.Count > 0)
-                {
-                    stageModel.ClassInfo.mapInfo = new List<string>(data.mapInfo);
-                    stageModel.SetCurrentMapInfo(0);
-                    Debug.Log($"[RMR SetNextStage] Applied stage mapInfo ({data.mapInfo.Count}) for {stageid}: {string.Join(",", data.mapInfo.ToArray())}");
-                }
-                else
-                {
-                    if (stageModel.ClassInfo.mapInfo == null)
-                        stageModel.ClassInfo.mapInfo = new List<string>();
-                    else
-                        stageModel.ClassInfo.mapInfo.Clear();
-                }
-            }
+            // StageModel.ClassInfo is the shared RMR reception shell. Never copy the selected
+            // node's map/type into it here: StageClassInfoList returns shared definitions, so
+            // doing that poisoned later New Run receptions with the previous creature map.
+            // RunStartBattleWithCurrentNodeDefinition applies these values only while vanilla
+            // StartBattle initializes the selected wave.
 
             // Impurity FloorOnly (蓝残响各层接待) must lock CurrentFloor so map/BGM match vanilla.
             TryApplyStageFloorOnly(data);
@@ -301,6 +287,64 @@ namespace abcdcode_LOGLIKE_MOD
             }
             LogLikeMod.curstagetype = stagetype;
             LogLikeMod.curstageid = data.id;
+        }
+
+        public static void RunStartBattleWithCurrentNodeDefinition(
+            StageController controller,
+            Action startBattle)
+        {
+            if (startBattle == null)
+                return;
+
+            if (controller == null)
+            {
+                startBattle();
+                return;
+            }
+
+            StageClassInfo selectedStage = Singleton<StageClassInfoList>.Instance.GetData(LogLikeMod.curstageid);
+            StageModel model = controller.GetStageModel();
+            StageClassInfo shellInfo = model?.ClassInfo;
+            if (selectedStage == null || shellInfo == null)
+            {
+                startBattle();
+                return;
+            }
+
+            FieldInfo stageTypeField = typeof(StageController).GetField("_stageType", AccessTools.all);
+            FieldInfo currentMapInfoField = typeof(StageModel).GetField("_currentMapInfo", AccessTools.all);
+            object originalStageType = stageTypeField?.GetValue(controller);
+            global::StageType originalClassStageType = shellInfo.stageType;
+            List<string> originalMapInfo = shellInfo.mapInfo;
+            object originalCurrentMapInfo = currentMapInfoField?.GetValue(model);
+            List<string> selectedMapInfo = selectedStage.mapInfo != null
+                ? new List<string>(selectedStage.mapInfo)
+                : new List<string>();
+            try
+            {
+                stageTypeField?.SetValue(controller, selectedStage.stageType);
+                shellInfo.stageType = selectedStage.stageType;
+                shellInfo.mapInfo = selectedMapInfo;
+                model.SetCurrentMapInfo(0);
+                if (selectedStage.stageType == global::StageType.Creature)
+                {
+                    Debug.Log(
+                        $"[RMR AbnoRoute] Applying Creature stage definition during StartBattle " +
+                        $"for stage={LogLikeMod.curstageid}, maps={string.Join(",", selectedMapInfo.ToArray())}.");
+                }
+                startBattle();
+            }
+            finally
+            {
+                if (stageTypeField != null)
+                    stageTypeField.SetValue(controller, originalStageType);
+                shellInfo.stageType = originalClassStageType;
+                shellInfo.mapInfo = originalMapInfo;
+                if (currentMapInfoField != null)
+                    currentMapInfoField.SetValue(model, originalCurrentMapInfo);
+                if (selectedStage.stageType == global::StageType.Creature)
+                    Debug.Log($"[RMR AbnoRoute] Restored RMR invitation shell after Creature StartBattle stage={LogLikeMod.curstageid}.");
+            }
         }
 
         /// <summary>

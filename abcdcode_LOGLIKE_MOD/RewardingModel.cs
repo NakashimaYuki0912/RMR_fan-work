@@ -24,6 +24,8 @@ namespace abcdcode_LOGLIKE_MOD
         private const double NormalBattleCardRewardRetentionRate = 0.49;
         private static readonly HashSet<LorId> NormalizedDropBookRewardIds = new HashSet<LorId>();
         private static bool BossFallbackRewardCheckedThisBattle;
+        private static bool SawLivingEnemyThisBattle;
+        private static bool LoggedUnconfirmedVictoryThisBattle;
         private static readonly Dictionary<int, string> KnownBookNameOverrides = new Dictionary<int, string>
         {
             { 260001, "Hana\u534f\u4f1a3\u79d1\u6536\u5c3e\u4eba\u4e4b\u9875" },
@@ -58,6 +60,41 @@ namespace abcdcode_LOGLIKE_MOD
         {
             NormalizedDropBookRewardIds.Clear();
             BossFallbackRewardCheckedThisBattle = false;
+        }
+
+        public static void ResetBattleVictoryConfirmation()
+        {
+            SawLivingEnemyThisBattle = false;
+            LoggedUnconfirmedVictoryThisBattle = false;
+        }
+
+        public static void ObserveLivingEnemyForVictoryConfirmation()
+        {
+            try
+            {
+                if (BattleObjectManager.instance != null
+                    && BattleObjectManager.instance.GetAliveListWithAvailable(Faction.Enemy).Count > 0)
+                {
+                    SawLivingEnemyThisBattle = true;
+                }
+            }
+            catch { /* battle objects are not ready yet */ }
+        }
+
+        public static bool HasConfirmedBattleVictory()
+        {
+            ObserveLivingEnemyForVictoryConfirmation();
+            if (!SawLivingEnemyThisBattle)
+                return false;
+            try
+            {
+                return BattleObjectManager.instance.GetAliveListWithAvailable(Faction.Player).Count > 0
+                    && BattleObjectManager.instance.GetAliveListWithAvailable(Faction.Enemy).Count == 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
         #endregion
 
@@ -1347,6 +1384,14 @@ namespace abcdcode_LOGLIKE_MOD
                 StageController sc = Singleton<StageController>.Instance;
                 if (sc == null)
                     return;
+                // Final reward cleanup is a secondary EndBattle caller. Keep the same
+                // live-combat invariant as EndBattle/EndBattlePhase/RewardClearStage so
+                // a misrouted mid-battle UI callback cannot manufacture a victory.
+                if (IsLiveCombatBothSidesAlive() && !IsNonCombatNodeStage())
+                {
+                    Debug.LogWarning("[RMR] TryEndRunAfterAllRewards refused: combat is still live.");
+                    return;
+                }
                 // Still have a queued wave → another fight in this reception, not run end.
                 try
                 {
@@ -1599,20 +1644,23 @@ namespace abcdcode_LOGLIKE_MOD
                 return;
             if (_midBattleEgoDoneAtLevel.Contains(lv))
                 return;
-            if (!RogueLike_Mod_Reborn.RMRAbnormalityUnlockManager.HasCompletedAnyRealization()
-                && (LogLikeMod.egoSelectionQueue == null || LogLikeMod.egoSelectionQueue.Count == 0))
+            bool hasOwnedEgo = false;
+            try
             {
-                // Still arm if route has any unlocked EGO (shop/reward) so mid-battle pick can run.
-                bool anyRouteEgo = false;
-                try
+                if (RMRRealizationManager.InRealizationBattle)
                 {
-                    anyRouteEgo = RogueLike_Mod_Reborn.RMRAbnormalityUnlockManager
-                        .EnumerateRouteUnlockedEgoPages()?.Any() == true;
+                    LogueBookModels.EnsureCompendiumUnlocks();
+                    hasOwnedEgo = LogueBookModels.CompendiumUnlockedEgoPages.Count > 0;
                 }
-                catch { anyRouteEgo = false; }
-                if (!anyRouteEgo)
-                    return;
+                else
+                {
+                    hasOwnedEgo = RMRAbnormalityUnlockManager.EnumerateRouteUnlockedEgoPages()?.Any() == true;
+                }
             }
+            catch { hasOwnedEgo = false; }
+            if (!hasOwnedEgo
+                && (LogLikeMod.egoSelectionQueue == null || LogLikeMod.egoSelectionQueue.Count == 0))
+                return;
             _pendingMidBattleEgoEmotionLevel = lv;
             Debug.Log($"[RMR] Armed mid-battle EGO selection after emotion abno pick level={lv}.");
         }
@@ -1770,15 +1818,32 @@ namespace abcdcode_LOGLIKE_MOD
                     Debug.Log("[RMR RewardClearStage] refuse EndBattle — both factions still have living units (live combat).");
                 return false;
             }
-            EnsureBossBattleCardReward();
             // Total party wipe = defeat. Do NOT open reward/next-stage UI just because nextlist was
             // pre-filled at StartBattle — that would let a lost fight continue the run.
             if (BattleObjectManager.instance.GetAliveListWithAvailable(Faction.Player).Count == 0)
             {
                 SingletonBehavior<BattleManagerUI>.Instance.ui_levelup.SetRootCanvas(false);
+                LoguePlayDataSaver.MarkRunDefeated("RewardClearStage party wipe");
                 Debug.Log("[RMR RewardClearStage] no living players → defeat / end reception.");
                 return true;
             }
+            if (!IsNonCombatNodeStage() && !HasConfirmedBattleVictory())
+            {
+                if (!LoggedUnconfirmedVictoryThisBattle)
+                {
+                    LoggedUnconfirmedVictoryThisBattle = true;
+                    Debug.LogWarning(
+                        "[RMR RewardClearStage] refused rewards/EndBattle: " +
+                        "the current combat has not observed living enemies followed by their defeat.");
+                }
+                return false;
+            }
+            if (!IsNonCombatNodeStage()
+                && !RMRAbnormalityUnlockManager.TryEnqueueBattleClearRewardsAfterVictory())
+            {
+                return false;
+            }
+            EnsureBossBattleCardReward();
             EnsureNextListIfNeeded();
             int rewardCount = LogLikeMod.rewards != null ? LogLikeMod.rewards.FindAll(x => x != null).Count : 0;
             int passiveCount = LogLikeMod.rewards_passive != null ? LogLikeMod.rewards_passive.FindAll(x => x != null).Count : 0;

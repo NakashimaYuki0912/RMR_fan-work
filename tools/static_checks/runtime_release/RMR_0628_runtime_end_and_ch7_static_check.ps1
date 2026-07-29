@@ -35,9 +35,9 @@ $logLikeMod = Read-Text "abcdcode_LOGLIKE_MOD\LogLikeMod.cs"
 foreach ($pattern in @(
     "[RMR SetNextStage] Stage not found",
     "[RMR SetNextStage] Stage has no wave data",
-    "startStage.mapInfo",
-    "stageModel.ClassInfo.mapInfo",
-    "[RMR SetNextStage] Stage {stageid} has no mapInfo"
+    "RunStartBattleWithCurrentNodeDefinition",
+    "originalMapInfo",
+    "shellInfo.mapInfo = originalMapInfo"
 )) {
     Require-Contains $logLikeMod $pattern "SetNextStage runtime-end guard"
 }
@@ -99,7 +99,8 @@ Require-True (($stage70021.Wave | Where-Object { $_.ManagerScript -eq "TwistedRe
 Require-Contains $logLikeMod "for (int i = 0; i < data.waveList.Count; i++)" "SetNextStage must enqueue all waves instead of only wave 0."
 Require-Contains $logLikeMod "wave={i + 1}/{data.waveList.Count}" "SetNextStage must log multi-wave impurity routing."
 Require-Contains $logLikeMod "waveListField?.SetValue(stageModel, stageWaveModelList)" "SetNextStage must recover a missing private wave list instead of null-refing."
-Require-Contains $logLikeMod "stageModel.ClassInfo != null" "SetNextStage must guard mapInfo writes when StageModel.ClassInfo is missing."
+Require-True ($logLikeMod -notmatch "stageModel\.ClassInfo\.mapInfo\s*=") "SetNextStage must not persist selected mapInfo into the shared reception shell."
+Require-Contains $logLikeMod "StageClassInfo shellInfo = model?.ClassInfo" "Temporary StartBattle definition must guard a missing StageModel.ClassInfo."
 
 $event70011 = $stageInfoCh7Event.StageXmlRoot.Stage | Where-Object { [string]$_.id -eq "70011" } | Select-Object -First 1
 $event70012 = $stageInfoCh7Event.StageXmlRoot.Stage | Where-Object { [string]$_.id -eq "70012" } | Select-Object -First 1

@@ -50,12 +50,57 @@ namespace abcdcode_LOGLIKE_MOD
         {
             if (this.owner.UnitData.floorBattleData.param2 > 0 || !this._teleportReady && (double)this.owner.hp > (double)this._teleportCondition)
                 return;
+            if (LogLikeMod.CheckStage(true))
+            {
+                EnterSecondPhaseInPlace();
+                return;
+            }
+            List<StageLibraryFloorModel> availableFloorList = Singleton<StageController>.Instance.GetStageModel().GetAvailableFloorList();
+            // Match the vanilla Purple Tear phase transition: move to a different,
+            // supported floor. Keeping only CurrentFloor makes ChangeFloorForcely a
+            // no-op and leaves the reception stuck between phases.
+            availableFloorList.RemoveAll(x => x.Sephirah == SephirahType.Chesed);
+            availableFloorList.RemoveAll(x => x.Sephirah == SephirahType.Hokma);
+            availableFloorList.RemoveAll(x => x.Sephirah == Singleton<StageController>.Instance.CurrentFloor);
+            if (availableFloorList.Count == 0)
+            {
+                UnityEngine.Debug.LogError("[RMR] Purple Tear phase transition deferred: no valid destination floor.");
+                return;
+            }
+
+            SephirahType destination = RandomUtil.SelectOne(availableFloorList).Sephirah;
+            // Commit the one-time phase state only after a real destination exists.
+            // ChangeFloorForcely invokes battle lifecycle hooks synchronously, so the
+            // purple exception flag must be visible for the duration of that call.
             LogLikeMod.purpleexcept = true;
             this.owner.UnitData.floorBattleData.param2 = 1;
-            List<StageLibraryFloorModel> availableFloorList = Singleton<StageController>.Instance.GetStageModel().GetAvailableFloorList();
-            availableFloorList.RemoveAll(x => x.Sephirah != Singleton<StageController>.Instance.CurrentFloor);
-            if (availableFloorList.Count > 0)
-                Singleton<StageController>.Instance.ChangeFloorForcely(RandomUtil.SelectOne(availableFloorList).Sephirah, this.owner);
+            try
+            {
+                Singleton<StageController>.Instance.ChangeFloorForcely(destination, this.owner);
+            }
+            catch (Exception ex)
+            {
+                // A failed transition must remain retryable. Leaving param2=1 makes the
+                // first form killable and turns the missing second phase into a false victory.
+                LogLikeMod.purpleexcept = false;
+                this.owner.UnitData.floorBattleData.param2 = 0;
+                this._teleported = 0;
+                UnityEngine.Debug.LogError("[RMR] Purple Tear phase transition failed and was rolled back: " + ex);
+            }
+        }
+
+        private void EnterSecondPhaseInPlace()
+        {
+            // RMR deliberately has one reception floor. Consuming a second floor makes
+            // party wipe wait for nonexistent librarians; calling ChangeFloorForcely on
+            // the current floor is a no-op. Commit Purple Tear's phase-two state in place
+            // and let OnRoundStartAfter rebuild stance/cards normally.
+            LogLikeMod.purpleexcept = false;
+            this.owner.UnitData.floorBattleData.param2 = 1;
+            this._teleported = 1;
+            this._areaCoolTime = 1;
+            this._teleportReady = false;
+            UnityEngine.Debug.Log("[RMR] Purple Tear entered phase two in place (single-floor reception).");
         }
 
         public override void OnRoundStartAfter()

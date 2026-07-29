@@ -113,20 +113,22 @@ if (-not (Test-Path (Join-Path $uploadRoot "Assemblies\dlls\RogueLike Mod Reborn
 }
 
 # Mirror to BACKUPS path used by historical VDF
-if (Test-Path $backupUpload) { Remove-Item -Recurse -Force $backupUpload }
+if (Test-Path -LiteralPath $backupUpload) { Remove-Item -LiteralPath $backupUpload -Recurse -Force }
 New-Item -ItemType Directory -Force -Path (Split-Path $backupUpload -Parent) | Out-Null
-Copy-Item -Recurse -Force $uploadRoot $backupUpload
+# Use named literal paths: the upload source lives on a drive-qualified path and
+# positional provider binding has previously misparsed its drive prefix on this machine.
+Copy-Item -LiteralPath $uploadRoot -Destination $backupUpload -Recurse -Force
 
 $dllCandidates = @(
     (Join-Path $backupUpload "Assemblies\dlls\RogueLike Mod Reborn.dll"),
     (Join-Path $backupUpload "Assemblies\RogueLike Mod Reborn.dll")
 ) | Where-Object { Test-Path $_ }
 if (-not $dllCandidates) { throw "DLL missing in upload tree" }
-$dllHash = (Get-FileHash $dllCandidates[0] -Algorithm SHA256).Hash
+$dllHash = (Get-FileHash @($dllCandidates)[0] -Algorithm SHA256).Hash
 
-$preview = Get-ChildItem $backupUpload -Filter "preview*" -File -ErrorAction SilentlyContinue | Select-Object -First 1
+$preview = Get-ChildItem -LiteralPath $backupUpload -Filter "preview*" -File -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $preview) {
-    $preview = Get-ChildItem $backupUpload -Filter "preview*" -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+    $preview = Get-ChildItem -LiteralPath $backupUpload -Filter "preview*" -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
 }
 if (-not $preview) { throw "preview image missing under $backupUpload" }
 

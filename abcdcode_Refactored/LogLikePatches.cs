@@ -759,9 +759,9 @@ namespace abcdcode_LOGLIKE_MOD
 
         /// <summary>
         /// Hook for sephirah floor buttons on battle prepare.
-        /// RMR StageStart used FloorNum=0 which makes GetAvailableFloorList empty, so vanilla
-        /// left every floor Closed and CurrentFloor stuck on Malkuth (历史层) — map/BGM never
-        /// followed the player's Language/Gebura (etc.) selection.
+        /// RMR receptions now use the vanilla single-floor budget. The player may choose
+        /// any initially available floor for its map/BGM, but after that floor is defeated
+        /// vanilla must close the others and report GameOver.
         /// </summary>
         public void UIBattleSettingPanel_SetCurrentSephirahButton(
           Action<UIBattleSettingPanel> orig,
@@ -772,7 +772,7 @@ namespace abcdcode_LOGLIKE_MOD
                 return;
             try
             {
-                // Force every non-null sephirah button Open so the player can pick floor theme.
+                // Preserve vanilla button states. Only remove old RMR text labels.
                 List<UISephirahButton> buttons = UIBattleSettingPanelSephirahButtonsField?.GetValue(self) as List<UISephirahButton>;
                 if (buttons == null)
                     return;
@@ -780,57 +780,13 @@ namespace abcdcode_LOGLIKE_MOD
                 {
                     if (btn == null)
                         continue;
-                    // ButtonState.Open = 0 in vanilla enum usage for available floors.
-                    btn.SetButtonState(UISephirahButton.ButtonState.Open);
-                    // Ensure clicks are accepted.
-                    try
-                    {
-                        FieldInfo disabled = typeof(UISephirahButton).GetField("isDisabled", AccessTools.all);
-                        if (disabled != null)
-                            disabled.SetValue(btn, false);
-                    }
-                    catch { /* ignore */ }
                     // Prepare UI: icons only — do not stamp RMR floor short names under sephirah buttons.
                     ClearSephirahFloorLabel(btn);
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[RMR] SetCurrentSephirahButton open-all failed: " + ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// Vanilla prints "Floors Available: {StageClassInfo.floorNum}" -- the *configured maximum*
-        /// number of floors a reception may deploy from, each normally consumed once
-        /// (GetAvailableFloorNumber == floorNum - usedFloorList.Count).
-        ///
-        /// RMR does not use floors that way: picking a sephirah only changes the map theme and BGM,
-        /// the roster never changes, and switching is meant to be free and repeatable. Showing 10
-        /// tells the player they have ten deployments left, which is simply not what the number
-        /// means here.
-        ///
-        /// Display-only on purpose. floorNum is left alone because GetAvailableFloorList -- the call
-        /// that actually decides which sephirah buttons can be picked -- filters on
-        /// floorOnlyList/exceptFloorList and never reads floorNum; lowering the field would change
-        /// GetAvailableFloorNumber for anything that consumes it while fixing nothing on screen.
-        /// </summary>
-        [HarmonyPostfix, HarmonyPatch(typeof(UIBattleSettingPanel), "SetButtonText")]
-        public static void UIBattleSettingPanel_SetButtonText_FloorCount(UIBattleSettingPanel __instance)
-        {
-            if (__instance == null || !LogLikeRoutines.IsRoguelikeBattleSettingContext())
-                return;
-            try
-            {
-                FieldInfo fi = AccessTools.Field(typeof(UIBattleSettingPanel), "txt_FloorText");
-                TextMeshProUGUI txt = fi?.GetValue(__instance) as TextMeshProUGUI;
-                if (txt == null)
-                    return;
-                txt.text = TextDataModel.GetText("ui_battlesetting_possiblefloor") + " 1";
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning("[RMR UI] floor-count label rewrite failed: " + ex.Message);
+                Debug.LogWarning("[RMR] SetCurrentSephirahButton label cleanup failed: " + ex.Message);
             }
         }
 
@@ -870,6 +826,14 @@ namespace abcdcode_LOGLIKE_MOD
           EmotionCoinType coinType,
           int count = 1)
         {
+            // Realization librarians are temporary Compendium projections created by
+            // RMR rather than vanilla floor librarians. Give them the normal realization
+            // cap, then preserve vanilla emotion-coin accumulation semantics.
+            if (RMRRealizationManager.InRealizationBattle)
+            {
+                self.SetMaxEmotionLevel(5);
+                return orig(self, coinType, count);
+            }
             if (!LogLikeMod.CheckStage(true))
                 return orig(self, coinType, count);
             self.SetMaxEmotionLevel(Math.Min((int)(LogLikeMod.curchaptergrade + 1), 5));
@@ -1031,6 +995,20 @@ namespace abcdcode_LOGLIKE_MOD
             try { RewardingModel.ResetMidBattleEgoSelectionState(); } catch { }
         }
 
+        private static void PrepareRealizationCombatResources(StageController controller)
+        {
+            ResetBattleEgoSelectionState(controller);
+            LogueBookModels.EnsureCompendiumUnlocks();
+            LogueBookModels.selectedEmotion = new List<RewardPassiveInfo>();
+            LogueBookModels.EmotionCardList = RMRAbnormalityUnlockManager.GetUnlockedEmotionCardsForBattle();
+            LogLikeMod.curemotion = 0;
+            LogLikeMod.egoSelectionQueue = new List<List<LorId>>();
+            Debug.Log(
+                $"[RMRRealizationManager] Prepared Compendium combat resources: " +
+                $"abno={LogueBookModels.EmotionCardList?.Count ?? 0}, " +
+                $"ego={LogueBookModels.CompendiumUnlockedEgoPages?.Count ?? 0}.");
+        }
+
         private sealed class PurpleTransitionEmotionState
         {
             public int EmotionLevel;
@@ -1135,6 +1113,11 @@ namespace abcdcode_LOGLIKE_MOD
             // Realization battles skip the normal Roguelike reward initialization
             if (RMRRealizationManager.InRealizationBattle)
             {
+                // StartBattle can run again during vanilla multi-phase transitions.
+                // Only reset the choice state before the first combat round; otherwise
+                // selected pages and accumulated emotion would be lost between phases.
+                if (!RMRRealizationManager.RealizationCombatLive)
+                    PrepareRealizationCombatResources(self);
                 orig(self);
                 // Vanilla Floor Realization grants floor EGO into personalEgo and can leave the
                 // hand UI stuck in EGO state — the roguelike post-orig cleanup below never runs
@@ -1158,10 +1141,16 @@ namespace abcdcode_LOGLIKE_MOD
                 return;
             }
 
-            if (LogLikeRoutines.IsRoguelikeBattleSettingContext())
+            bool isRoguelikeBattle = LogLikeRoutines.IsRoguelikeBattleSettingContext();
+            if (isRoguelikeBattle)
             {
+                // Reset stale EndBattle flag at battle start. Without this, a later
+                // party wipe returns "defeat" from RewardClearStage every frame but
+                // skips the actual EndBattle call because the previous node left it true.
+                LogLikeMod.EndBattle = false;
                 ResetBattleEgoSelectionState(self);
                 RewardingModel.ResetDropBookRewardNormalization();
+                RewardingModel.ResetBattleVictoryConfirmation();
                 RMRAbnormalityUnlockManager.ResetRedMistChallengeBattleState();
                 LogLikeMod.BattleMoneyUI.Active();
                 LogueBookModels.selectedEmotion = new List<RewardPassiveInfo>();
@@ -1208,7 +1197,6 @@ namespace abcdcode_LOGLIKE_MOD
                         TryAddExtraEquipPageReward();
                     }
                 }
-                RMRAbnormalityUnlockManager.EnqueueBattleClearRewards();
                 RMRAbnormalityUnlockManager.SuppressRedMistChallengeGenericRewards();
                 // ResetNextStage already builds Grade(N+1) options after a Boss (including Grade6→Grade7 杂质).
                 // Do not re-clear here with a conflicting final-chapter rule.
@@ -1231,9 +1219,13 @@ namespace abcdcode_LOGLIKE_MOD
             {
                 LogLikeMod.ResetUIs();
             }
-            orig(self);
-            if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
+            if (isRoguelikeBattle)
+                LogLikeMod.RunStartBattleWithCurrentNodeDefinition(self, () => orig(self));
+            else
+                orig(self);
+            if (!isRoguelikeBattle)
                 return;
+            RewardingModel.ObserveLivingEnemyForVictoryConfirmation();
             Singleton<GlobalLogueEffectManager>.Instance.OnStartBattleAfter();
             // Do NOT dump all owned EGO into personalEgo at start — that forces the EGO hand UI and
             // blocks combat-page selection. Mid-battle picks grant only the chosen id.
@@ -1301,7 +1293,9 @@ namespace abcdcode_LOGLIKE_MOD
           Func<StageController, bool> orig,
           StageController self)
         {
-            if (!LogLikeMod.CheckStage(true))
+            // Realizations use the same tier-aware choice flow as RMR combat, backed by
+            // the permanent Compendium pools prepared at StartBattle.
+            if (!LogLikeMod.CheckStage(true) && !RMRRealizationManager.InRealizationBattle)
                 return orig(self);
             foreach (BattleUnitModel alive in BattleObjectManager.instance.GetAliveList())
             {
@@ -3020,6 +3014,7 @@ namespace abcdcode_LOGLIKE_MOD
             // Non-combat node exit (shop/mystery leave) also ends once the next wave's RoundStart runs.
             try { RewardingModel.ClearSuppressSpuriousEndBattle(); } catch { /* ignore */ }
             try { RewardingModel.ClearNonCombatNodeExit(); } catch { /* ignore */ }
+            try { RewardingModel.ObserveLivingEnemyForVictoryConfirmation(); } catch { /* ignore */ }
 
             if (!LogLikeMod.GetFieldValue<bool>(__instance, "_bCalledRoundStart_system") && LogLikeMod.CheckStage())
                 Singleton<GlobalLogueEffectManager>.Instance.OnRoundStart(__instance);
@@ -5380,9 +5375,12 @@ namespace abcdcode_LOGLIKE_MOD
           UIBattleSettingLibrarianInfoPanel __instance,
           UnitDataModel data)
         {
-            __instance.PassiveListSelectable.SubmitEvent.RemoveAllListeners();
-            if (!LogLikeRoutines.IsRoguelikeBattleSettingContext() || !LogueBookModels.playerModel.Contains(data))
+            if (__instance == null || data == null || !LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return;
+            // Vanilla may hand this panel an equivalent realization UnitDataModel rather
+            // than the exact object stored in playerModel. Context is the authoritative
+            // guard; requiring reference identity made passive succession unclickable.
+            __instance.PassiveListSelectable.SubmitEvent.RemoveAllListeners();
             // Passive names here come from mod data that may have no translation for the current
             // language, so they stay Chinese while the UI font is Latin-only and draw as 口口口
             // ("9口口口" in the Passive Attribution list). Repair this panel once it is populated;
@@ -5395,7 +5393,10 @@ namespace abcdcode_LOGLIKE_MOD
                 __instance.passiveSlotsPanel.SetStatsDataInEquipBook(data.bookItem);
                 (UI.UIController.Instance.GetUIPanel(UIPanelType.BattleSetting) as UIBattleSettingPanel).EditPanel.EquipPagePanel.ChangeEquipBook(null);
                 UIControlManager.Instance.SelectSelectableForcely(__instance.PassiveListSelectable);
-                LoguePlayDataSaver.SavePlayData_Menu();
+                // Realization loadouts are temporary projections and must not overwrite
+                // the route snapshot while the player assigns Compendium passives.
+                if (!RMRRealizationManager.IsRealizationPreparationActive)
+                    LoguePlayDataSaver.SavePlayData_Menu();
             }))));
         }
 
@@ -5695,9 +5696,19 @@ namespace abcdcode_LOGLIKE_MOD
             try
             {
                 StageModel model = __instance.GetStageModel();
-                StageClassInfo info = model?.ClassInfo;
+                StageClassInfo info = Singleton<StageClassInfoList>.Instance.GetData(LogLikeMod.curstageid)
+                    ?? model?.ClassInfo;
                 if (info == null)
                     return;
+
+                // Vanilla StartBattle already initialized the selected CreatureMap while the
+                // temporary node definition was active. Do not replace it with the floor map
+                // after the RMR invitation shell has been restored.
+                if (LogLikeMod.curstagetype == StageType.Creature)
+                {
+                    Debug.Log($"[RMR] StartBattle keep creature map for stage={LogLikeMod.curstageid}.");
+                    return;
+                }
 
                 // Impurity bosses / story receptions with MapInfo: leave vanilla map pipeline alone.
                 // Our previous ChangeToSephirahMap ran AFTER ManagerScript.OnWaveStart and wiped
@@ -5917,6 +5928,14 @@ namespace abcdcode_LOGLIKE_MOD
         [HarmonyPrefix, HarmonyPatch(typeof(StageController), nameof(StageController.GameOver))]
         public static void StageController_GameOver(ref bool iswin, ref bool isbackbutton)
         {
+            if (!iswin
+                && !RMRRealizationManager.RealizationCombatLive
+                && !RMRRealizationManager.InRealizationBattle
+                && LogLikeMod.CheckStage(true))
+            {
+                LoguePlayDataSaver.MarkRunDefeated("StageController.GameOver");
+            }
+
             // Realization defeat goes through vanilla GameOver, NOT EndBattle, so the
             // EndBattle-hook cleanup (flags + route loadout restore) never ran. Stale
             // InRealizationBattle/CompendiumOnlyLoadoutActive then corrupts the next
@@ -6035,7 +6054,10 @@ namespace abcdcode_LOGLIKE_MOD
 
             if (partyWiped || impurityRunComplete)
             {
-                LoguePlayDataSaver.RemovePlayerData();
+                if (partyWiped)
+                    LoguePlayDataSaver.MarkRunDefeated("StageController.ClearBattle party wipe");
+                else
+                    LoguePlayDataSaver.RemovePlayerData();
                 Debug.Log($"[RMR] ClearBattle: wiped Lastest continue save (partyWiped={partyWiped}, impurityRunComplete={impurityRunComplete}).");
             }
             else

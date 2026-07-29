@@ -79,6 +79,7 @@ namespace RogueLike_Mod_Reborn
         private static bool RedMistVictoryRewardsGrantedThisBattle;
         private static bool BlackSilenceClearRecordedThisBattle;
         private static bool BlueReverberationRewardsGrantedThisBattle;
+        private static bool BattleClearRewardsEnqueuedThisBattle;
 
         // Floor -> all abnormality script roots on that floor
         // Sourced from vanilla EmotionCard_*.txt <Sephirah> tags
@@ -525,7 +526,8 @@ namespace RogueLike_Mod_Reborn
                 _vanillaEmotionTierByScript[script] = tier;
             }
 
-            // Yesod (tech) — SingingMachine music/旋律 = tier III (emotion 5 only)
+            // Yesod (tech) — Music=III, Rhythm=I, Musical Addiction=II.
+            // Source: vanilla EmotionCard_yesod plus Library_of_Ruina_Abnormality_Pages_EN.
             Put("murderer", 1); Put("murderer2", 2); Put("murderer3", 1);
             Put("helper", 2); Put("helper2", 1); Put("helper3", 2);
             Put("singingMachine", 3); Put("singingMachine2", 1); Put("singingMachine3", 2);
@@ -733,6 +735,21 @@ namespace RogueLike_Mod_Reborn
             }
         }
 
+        public static bool TryEnqueueBattleClearRewardsAfterVictory()
+        {
+            if (BattleClearRewardsEnqueuedThisBattle)
+                return true;
+            if (!RewardingModel.HasConfirmedBattleVictory())
+                return false;
+
+            EnqueueBattleClearRewards();
+            BattleClearRewardsEnqueuedThisBattle = true;
+            Debug.Log(
+                $"[RMRAbnormalityUnlockManager] Enqueued battle-clear rewards after confirmed victory: " +
+                $"type={LogLikeMod.curstagetype}, grade={LogLikeMod.curchaptergrade}.");
+            return true;
+        }
+
         public static bool IsBinahUnlockedForCurrentRoute()
         {
             return BinahUnlockedForCurrentRoute;
@@ -748,6 +765,7 @@ namespace RogueLike_Mod_Reborn
             RedMistVictoryRewardsGrantedThisBattle = false;
             BlackSilenceClearRecordedThisBattle = false;
             BlueReverberationRewardsGrantedThisBattle = false;
+            BattleClearRewardsEnqueuedThisBattle = false;
         }
 
         private static bool IsRedMistChallengeStage()
@@ -1254,22 +1272,27 @@ namespace RogueLike_Mod_Reborn
 
         /// <summary>
         /// Pool of E.G.O. card ids available for mid-battle picks (emotion 3/4/5 after abno).
-        /// ONLY route-unlocked / already-obtained EGO — never the full realization floor table
-        /// (that offered unowned EGO). Excludes ids already selected this reception.
+        /// Normal routes use only route-owned E.G.O.; realization battles use permanent
+        /// Compendium ownership. Excludes ids already selected this reception.
         /// </summary>
         public static List<LorId> CollectMidBattleEgoCandidates(HashSet<int> alreadySelectedThisBattle)
         {
             var candidates = new List<LorId>();
             var seen = new HashSet<int>();
+            bool usePermanentCompendium = RMRRealizationManager.InRealizationBattle
+                || RMRRealizationManager.IsRealizationPreparationActive;
+            if (usePermanentCompendium)
+                LogueBookModels.EnsureCompendiumUnlocks();
             void Consider(LorId id)
             {
                 if (id == null || id == LorId.None)
                     return;
                 if (alreadySelectedThisBattle != null && alreadySelectedThisBattle.Contains(id.id))
                     return;
-                // Must already be unlocked/obtained this route (picked / shop / reward).
-                // Atlas permanent unlock alone is NOT enough — that is shop/reward pool only.
-                if (!IsEgoOwnedOnCurrentRoute(id))
+                bool isOwned = usePermanentCompendium
+                    ? LogueBookModels.IsCompendiumEgoPageUnlocked(id)
+                    : IsEgoOwnedOnCurrentRoute(id);
+                if (!isOwned)
                     return;
                 if (!seen.Add(id.id))
                     return;
@@ -1281,8 +1304,10 @@ namespace RogueLike_Mod_Reborn
                 candidates.Add(card.id != null ? card.id : id);
             }
 
-            // Only pages the player already owns/unlocked this route.
-            foreach (LorId id in RouteUnlockedEgoPages)
+            IEnumerable<LorId> ownedEgoPages = usePermanentCompendium
+                ? LogueBookModels.CompendiumUnlockedEgoPages
+                : RouteUnlockedEgoPages;
+            foreach (LorId id in ownedEgoPages)
                 Consider(id);
 
             // Inventory copies (if any) that count as owned EGO.
@@ -1302,7 +1327,8 @@ namespace RogueLike_Mod_Reborn
             }
             catch { /* ignore */ }
 
-            Debug.Log($"[RMR] Mid-battle EGO candidates (owned-only) count={candidates.Count} ids=[{string.Join(",", candidates.Select(x => x.id.ToString()).ToArray())}]");
+            string source = usePermanentCompendium ? "Compendium" : "route";
+            Debug.Log($"[RMR] Mid-battle EGO candidates ({source}, owned-only) count={candidates.Count} ids=[{string.Join(",", candidates.Select(x => x.id.ToString()).ToArray())}]");
             return candidates;
         }
 
@@ -1749,7 +1775,11 @@ namespace RogueLike_Mod_Reborn
             Add(script.ToLowerInvariant());
             if (!string.IsNullOrEmpty(root))
             {
-                Add(root.ToLowerInvariant());
+                // A numbered script is a distinct abnormality page. Falling back from
+                // SingingMachine2/3 to the unnumbered root resolves both to Music and
+                // cross-pairs its artwork with Rhythm/Musical Addiction.
+                if (string.IsNullOrEmpty(digits))
+                    Add(root.ToLowerInvariant());
                 if (!string.IsNullOrEmpty(digits))
                     Add(root.ToLowerInvariant() + digits);
             }

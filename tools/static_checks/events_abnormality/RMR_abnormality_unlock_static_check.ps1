@@ -34,6 +34,7 @@ foreach ($pattern in @(
   "MysteryRewardCount",
   "GetUnlockedEmotionCardsForBattle",
   "EnqueueRewardSelections",
+  "TryEnqueueBattleClearRewardsAfterVictory",
   "RecordPermanentClear",
   "ResetArchiveProgress",
   "GetNoAbnormalityFallback"
@@ -70,7 +71,7 @@ foreach ($forbidden in @("Redhood", "BigBadWolf", "Mountain", "Nosferatu", "Bloo
 $patches = Get-Content (Join-Path $root "abcdcode_Refactored\LogLikePatches.cs") -Raw
 foreach ($pattern in @(
   "RMRAbnormalityUnlockManager.GetUnlockedEmotionCardsForBattle",
-  "RMRAbnormalityUnlockManager.EnqueueBattleClearRewards",
+  "RewardingModel.ResetBattleVictoryConfirmation",
   "RMRAbnormalityUnlockManager.RecordPermanentClear",
   "RMRAbnormalityUnlockManager.OnEmotionPagePicked",
   "StageType.Creature"
@@ -82,7 +83,8 @@ foreach ($pattern in @(
 
 $rewarding = Get-Content (Join-Path $root "abcdcode_LOGLIKE_MOD\RewardingModel.cs") -Raw
 foreach ($pattern in @(
-  "RMRAbnormalityUnlockManager.GetNoAbnormalityFallback"
+  "RMRAbnormalityUnlockManager.GetNoAbnormalityFallback",
+  "RMRAbnormalityUnlockManager.TryEnqueueBattleClearRewardsAfterVictory"
 )) {
   if ($rewarding -notmatch [regex]::Escape($pattern)) {
     throw "RewardingModel missing $pattern"
