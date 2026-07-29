@@ -121,6 +121,8 @@ namespace RogueLike_Mod_Reborn
         {
             if (book == null)
                 return 99;
+            if (LogueBookModels.IsUrbanStarSpecialCorePage(book))
+                return ChapterUrbanStar;
             int ch = book.Chapter;
             if (ch <= 0)
                 ch = 1;

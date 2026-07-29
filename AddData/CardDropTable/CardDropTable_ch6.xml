@@ -69,9 +69,31 @@
     <Card>608014</Card>
     <Card>608015</Card>
     <Card>608016</Card>
-    
 
-    
+    <!-- Purple Tear: public combat pages only (exclude MultiDeck stance and OnlyPage cards). -->
+    <Card>609001</Card>
+    <Card>609002</Card>
+    <Card>609003</Card>
+    <Card>609004</Card>
+    <Card>609005</Card>
+    <Card>609006</Card>
+    <Card>609007</Card>
+    <Card>609008</Card>
+    <Card>609009</Card>
+    <Card>609010</Card>
+    <Card>609011</Card>
+    <Card>609012</Card>
+
+    <!-- Xiao: public combat pages only (exclude E.G.O., OnlyPage, unused and enemy-only cards). -->
+    <Card>610002</Card>
+    <Card>610003</Card>
+    <Card>610004</Card>
+    <Card>610005</Card>
+    <Card>610008</Card>
+    <Card>610009</Card>
+    <Card>610010</Card>
+    <Card>610011</Card>
+
     <Card>611004</Card>
     <Card>611005</Card>
     <Card>611006</Card>

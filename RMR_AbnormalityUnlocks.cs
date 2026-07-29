@@ -541,7 +541,7 @@ namespace RogueLike_Mod_Reborn
             // Hod — shyLook / 今日的表情 = tier I
             Put("shyLook", 1); Put("shyLook2", 1); Put("shyLook3", 2);
             Put("shylook", 1); Put("shylook2", 1); Put("shylook3", 2);
-            Put("ShyLookToday1", 1); Put("ShyLookToday2", 1); Put("ShyLookToday3", 2);
+            Put("ShyLookToday1", 1); Put("ShyLookToday2", 2); Put("ShyLookToday3", 1);
             Put("redshoes", 1); Put("redshoes2", 2); Put("redshoes3", 1);
             Put("spiderbud", 1); Put("spiderbud2", 2); Put("spiderbud3", 2);
             Put("latitia1", 1); Put("latitia2", 2); Put("latitia3", 2);
@@ -913,7 +913,9 @@ namespace RogueLike_Mod_Reborn
 
             BlackSilenceClearRecordedThisBattle = true;
             RMRCore.RecordBlackSilenceStageClear();
-            Debug.Log("[RMRAbnormalityUnlockManager] Black Silence clear recorded; Black Silence core page will be granted on Urban Star entry.");
+            bool corePageGranted = RMRCore.GrantBlackSilenceVictoryReward();
+            Debug.Log($"[RMRAbnormalityUnlockManager] Black Silence clear recorded; core page " +
+                      $"{(corePageGranted ? "confirmed in current route and permanent compendium" : "grant failed; see prior error")}.");
         }
 
         public static void GrantDistortedEnsembleVictoryRewards()
@@ -1670,8 +1672,8 @@ namespace RogueLike_Mod_Reborn
                 { "ForsakenMurderer3", "murderer3" },
                 // Today's Shy Look
                 { "ShyLookToday1", "shylook" },
-                { "ShyLookToday2", "shylook2" },
-                { "ShyLookToday3", "shylook3" },
+                { "ShyLookToday2", "shylook3" },
+                { "ShyLookToday3", "shylook2" },
                 // Fragment of the Universe
                 { "UniverseZogak1", "fragmentspace" },
                 { "UniverseZogak2", "fragmentspace2" },
@@ -1684,10 +1686,10 @@ namespace RogueLike_Mod_Reborn
                 { "ChildofGalaxy1", "galaxychild" },
                 { "ChildofGalaxy2", "galaxychild2" },
                 { "ChildofGalaxy3", "galaxychild3" },
-                // Heart of Aspiration (3rd page is vanilla "doki", not heart*)
-                { "HeartofAspiration1", "heart" },
-                { "HeartofAspiration2", "heart_rush" },
-                { "HeartofAspiration3", "doki" },
+                // Heart of Aspiration (numbered reward order differs from vanilla script names)
+                { "HeartofAspiration1", "doki" },
+                { "HeartofAspiration2", "heart" },
+                { "HeartofAspiration3", "heart_rush" },
                 // Little Helper
                 { "LittleHelper1", "helper" },
                 { "LittleHelper2", "helper2" },

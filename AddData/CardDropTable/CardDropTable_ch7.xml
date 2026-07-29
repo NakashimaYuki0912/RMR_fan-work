@@ -3,6 +3,20 @@
   <Version>1.1</Version>
 
   <DropTable ID="-854601">
+    <!-- Hana Association public combat pages. 701001 is an OnlyPage card. -->
+    <Card Pid="@origin">701002</Card>
+    <Card Pid="@origin">701003</Card>
+    <Card Pid="@origin">701004</Card>
+    <Card Pid="@origin">701005</Card>
+    <Card Pid="@origin">701006</Card>
+    <Card Pid="@origin">701007</Card>
+    <Card Pid="@origin">701008</Card>
+    <Card Pid="@origin">701009</Card>
+    <Card Pid="@origin">701010</Card>
+    <Card Pid="@origin">701011</Card>
+    <Card Pid="@origin">701012</Card>
+
+    <!-- Reverberation Ensemble public combat pages. -->
     <Card Pid="@origin">704001</Card>
     <Card Pid="@origin">704002</Card>
     <Card Pid="@origin">704003</Card>

@@ -40,6 +40,8 @@
     <RewardList ID="255002" PassiveType="Nolimit" Rarity="Uncommon" TargetType="All" RewardType="EquipPage" ArtWork="255002"/>
     <RewardList ID="256001" PassiveType="Nolimit" Rarity="Unique" TargetType="All" RewardType="EquipPage" ArtWork="256001"/>
     <RewardList ID="256002" PassiveType="Nolimit" Rarity="Uncommon" TargetType="All" RewardType="EquipPage" ArtWork="256002"/>
+    <RewardList ID="250035" PassiveType="Nolimit" Rarity="Unique" TargetType="All" RewardType="EquipPage" ArtWork="250035"/>
+    <RewardList ID="250036" PassiveType="Nolimit" Rarity="Unique" TargetType="All" RewardType="EquipPage" ArtWork="250036"/>
   </ChapterList>
 
 </RewardPassivesRoot>

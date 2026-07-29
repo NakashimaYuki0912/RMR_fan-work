@@ -178,6 +178,7 @@ namespace abcdcode_LOGLIKE_MOD
             PassiveAbility_MoneyCheck.SubMoney(this.price);
             LogueBookModels.DeleteCard(cardid);
             LogueBookModels.AddCard(new LorId(popup.metadata.unparsedPid, cardid.id));
+            LogueBookModels.SavePermanentCompendiumData();
             UISoundManager.instance.PlayEffectSound(UISoundType.Card_Apply);
             CardAddVfx.RunCardVfx(popup.slot);
             if (this.parent != null)

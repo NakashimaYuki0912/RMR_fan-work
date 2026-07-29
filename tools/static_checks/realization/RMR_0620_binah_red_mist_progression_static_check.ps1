@@ -53,9 +53,10 @@ Assert-NoMatch 'Grade6 entry no longer grants Binah' $grade6Grant 'TryAddUniqueR
 Assert-Match 'Selecting a stage reapplies Binah challenge progression' $patches 'SetNextStage\s*\(\s*stage\.Id\s*,\s*stage\.type\s*\)\s*;[\s\S]*ApplyBinahRedMistProgressionState'
 Assert-Match 'Temporary Binah access adds only to current booklist' $temporaryGrant 'EnsureRoleBookInCurrentBooklist\s*\(\s*binah\.id\s*\)'
 Assert-NoMatch 'Temporary Binah access does not write permanent atlas' $temporaryGrant 'TryAddUniqueRoleBookToInventoryAndAtlas|RecordAtlasRoleBook'
-Assert-Match 'Permanent atlas sync filters premature Binah' $models 'ShouldRecordRoleBookInPermanentAtlas'
+Assert-Match 'Permanent Compendium gates Binah until Red Mist victory' $core 'ShouldRecordRoleBookInPermanentCompendium[\s\S]*IsRedMistChallengeVictoryRecorded'
 Assert-Match 'Save loading reapplies Binah challenge progression state' $saver 'ApplyBinahRedMistProgressionState'
 Assert-Match 'Red Mist victory unlocks Binah for the current route' $core 'UnlockBinahForCurrentRoute\s*\(\s*\)'
+Assert-Match 'Red Mist victory records Binah in permanent Compendium' $core 'UnlockBinahAfterRedMistVictory[\s\S]*TryAddUniqueRoleBookToInventoryAndCompendium\s*\(\s*binah\.id\s*\)'
 Assert-Match 'Binah remains recognized as a fixed-deck core page' $models 'bool isBinah'
 
 if ($errors.Count -gt 0) {

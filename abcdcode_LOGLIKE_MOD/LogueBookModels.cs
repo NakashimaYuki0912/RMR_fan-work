@@ -1054,6 +1054,55 @@ namespace abcdcode_LOGLIKE_MOD
             return savedId;
         }
 
+        /// <summary>
+        /// Permanent Compendium data can be loaded at the invitation hub without loading a
+        /// route save first. Dynamic upgrade definitions only exist in ItemXmlDataList for
+        /// the current process, so rebuild every recorded upgraded ID before a realization
+        /// projects the Compendium into its temporary combat inventory.
+        /// </summary>
+        public static void RestoreCompendiumUpgradeDefinitions()
+        {
+            LogueBookModels.EnsureCompendiumUnlocks();
+            if (LogueBookModels.CompendiumUnlockedBattleCards == null
+                || LogueBookModels.CompendiumUnlockedBattleCards.Count == 0)
+                return;
+
+            var replacements = new List<KeyValuePair<LorId, LorId>>();
+            int restoredCount = 0;
+            foreach (LorId savedId in LogueBookModels.CompendiumUnlockedBattleCards.ToList())
+            {
+                if (savedId == null || savedId == LorId.None
+                    || string.IsNullOrEmpty(savedId.packageId)
+                    || !UpgradeMetadata.UnpackPid(savedId.packageId, out UpgradeMetadata metadata))
+                    continue;
+                try
+                {
+                    DiceCardXmlInfo restored = Singleton<LogCardUpgradeManager>.Instance.GetUpgradeCard(
+                        savedId.GetOriginalId(), metadata.index, metadata.count);
+                    if (restored?.id == null)
+                    {
+                        Debug.LogWarning($"[RMR Atlas] Failed to rebuild Compendium upgraded page {savedId}.");
+                        continue;
+                    }
+                    restoredCount++;
+                    if (restored.id != savedId)
+                        replacements.Add(new KeyValuePair<LorId, LorId>(savedId, restored.id));
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[RMR Atlas] Failed to rebuild Compendium upgraded page {savedId}: {ex.Message}");
+                }
+            }
+
+            foreach (KeyValuePair<LorId, LorId> replacement in replacements)
+            {
+                LogueBookModels.CompendiumUnlockedBattleCards.Remove(replacement.Key);
+                LogueBookModels.CompendiumUnlockedBattleCards.Add(replacement.Value);
+            }
+            if (restoredCount > 0)
+                Debug.Log($"[RMR Atlas] Rebuilt {restoredCount} upgraded combat page definition(s) from permanent Compendium.");
+        }
+
         private static void EnsureRemainStageListIntegrity()
         {
             if (LogueBookModels.RemainStageList == null)
@@ -1646,6 +1695,19 @@ namespace abcdcode_LOGLIKE_MOD
                 || isBinah;
         }
 
+        /// <summary>
+        /// These pages are unlocked by RMR's Urban Star progression even when their
+        /// vanilla XML chapter is Impurity or their data comes from an RMR reward.
+        /// Use this shared classifier for realization prepare filters.
+        /// </summary>
+        public static bool IsUrbanStarSpecialCorePage(BookXmlInfo page)
+        {
+            return IsBlackSilenceCorePage(page)
+                || RMRCore.IsBinahCorePage(page)
+                || IsRedMistCorePage(page)
+                || RMRCore.IsBlueReverberationCorePage(page);
+        }
+
         private static BookXmlInfo ResolveFreshEquipPage(BookXmlInfo page)
         {
             if (page == null || (!IsGrade6SpecialBuiltInDeckPage(page) && !RMRCore.IsBlueReverberationCorePage(page)))
@@ -1681,7 +1743,7 @@ namespace abcdcode_LOGLIKE_MOD
             }
         }
 
-        private static bool IsBlackSilenceCorePage(BookXmlInfo page)
+        public static bool IsBlackSilenceCorePage(BookXmlInfo page)
         {
             return page != null
                 && (page.TextId == 102
@@ -1694,7 +1756,7 @@ namespace abcdcode_LOGLIKE_MOD
                             && skin.IndexOf("BlackSilence", StringComparison.OrdinalIgnoreCase) >= 0)));
         }
 
-        private static bool IsRedMistCorePage(BookXmlInfo page)
+        public static bool IsRedMistCorePage(BookXmlInfo page)
         {
             return page != null
                 && (page.id.id == 250022

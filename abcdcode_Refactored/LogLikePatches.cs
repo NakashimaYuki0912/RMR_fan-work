@@ -826,17 +826,66 @@ namespace abcdcode_LOGLIKE_MOD
           EmotionCoinType coinType,
           int count = 1)
         {
-            // Realization librarians are temporary Compendium projections created by
-            // RMR rather than vanilla floor librarians. Give them the normal realization
-            // cap, then preserve vanilla emotion-coin accumulation semantics.
+            // Realization librarians are temporary Compendium projections. Their saved
+            // OwnerSephirah can differ from the floor currently being realized, while
+            // vanilla CreateEmotionCoin returns 0 when StageModel.GetFloor(owner) is null.
+            // Temporarily bind the projection to the active floor so the complete vanilla
+            // coin path runs (passive callbacks, team E.G.O. cooldown, and IV -> V included).
             if (RMRRealizationManager.InRealizationBattle)
             {
-                self.SetMaxEmotionLevel(5);
+                BattleUnitModel realizationUnit =
+                    BattleUnitEmotionDetailSelfField.GetValue(self) as BattleUnitModel;
+                if (realizationUnit != null && realizationUnit.faction == Faction.Player)
+                    return CreateRealizationEmotionCoinsWithCurrentFloor(orig, self, coinType, count);
                 return orig(self, coinType, count);
             }
             if (!LogLikeMod.CheckStage(true))
                 return orig(self, coinType, count);
-            self.SetMaxEmotionLevel(Math.Min((int)(LogLikeMod.curchaptergrade + 1), 5));
+            return CreateRmrEmotionCoins(
+                self,
+                coinType,
+                count,
+                Math.Min((int)(LogLikeMod.curchaptergrade + 1), 5));
+        }
+
+        private static int CreateRealizationEmotionCoinsWithCurrentFloor(
+            Func<BattleUnitEmotionDetail, EmotionCoinType, int, int> orig,
+            BattleUnitEmotionDetail self,
+            EmotionCoinType coinType,
+            int count)
+        {
+            self.SetMaxEmotionLevel(5);
+            BattleUnitModel battleUnitModel =
+                BattleUnitEmotionDetailSelfField.GetValue(self) as BattleUnitModel;
+            UnitDataModel unitData = battleUnitModel?.UnitData?.unitData;
+            StageController controller = Singleton<StageController>.Instance;
+            FieldInfo ownerSephirahField = AccessTools.Field(typeof(UnitDataModel), "_ownerSephirah");
+            if (unitData == null || controller == null || ownerSephirahField == null)
+                return CreateRmrEmotionCoins(self, coinType, count, 5);
+
+            SephirahType originalFloor = (SephirahType)ownerSephirahField.GetValue(unitData);
+            SephirahType currentFloor = controller.CurrentFloor;
+            bool rebound = originalFloor != currentFloor;
+            try
+            {
+                if (rebound)
+                    ownerSephirahField.SetValue(unitData, currentFloor);
+                return orig(self, coinType, count);
+            }
+            finally
+            {
+                if (rebound)
+                    ownerSephirahField.SetValue(unitData, originalFloor);
+            }
+        }
+
+        private static int CreateRmrEmotionCoins(
+            BattleUnitEmotionDetail self,
+            EmotionCoinType coinType,
+            int count,
+            int maximumEmotionLevel)
+        {
+            self.SetMaxEmotionLevel(maximumEmotionLevel);
             BattleUnitModel battleUnitModel = (BattleUnitModel)BattleUnitEmotionDetailSelfField.GetValue(self);
             if (battleUnitModel.faction == Faction.Player && battleUnitModel.UnitData.unitData.gender == Gender.Creature)
                 return 0;
@@ -1718,7 +1767,7 @@ namespace abcdcode_LOGLIKE_MOD
           StageLibraryFloorModel self,
           EmotionEgoXmlInfo egoCard)
         {
-            if (LogLikeMod.CheckStage(true)
+            if ((LogLikeMod.CheckStage(true) || RMRRealizationManager.InRealizationBattle)
                 && RewardingModel.rewardFlag == RewardingModel.RewardFlag.EgoCardReward
                 && LogLikeMod.egoSelectionQueue != null
                 && LogLikeMod.egoSelectionQueue.Count > 0)
@@ -3796,7 +3845,9 @@ namespace abcdcode_LOGLIKE_MOD
             if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return true;
             __instance.Log("Refrash Character start");
-            UnitBattleDataModel battledata = LogueBookModels.playerBattleModel.Find(x => x.unitData == data);
+            UnitDataModel targetUnit = ResolveRoguelikeUnitData(data);
+            UnitBattleDataModel battledata = LogueBookModels.playerBattleModel?
+                .Find(model => model?.unitData == targetUnit);
             if (battledata != null)
             {
                 UICharacterSlot uiCharacterSlot = LogLikeMod.GetFieldValue<UICharacterList>(__instance, "CharacterList").slotList.Find(x => x.unitBattleData == battledata);
@@ -3819,25 +3870,34 @@ namespace abcdcode_LOGLIKE_MOD
         {
             if (!LogLikeRoutines.IsRoguelikeBattleSettingContext() || isEnemySetting)
                 return true;
-            int num = LogueBookModels.playerBattleModel.IndexOf(LogueBookModels.playerBattleModel.Find((Predicate<UnitBattleDataModel>)(x => x.unitData == __instance)));
+            UnitDataModel targetUnit = ResolveRoguelikeUnitData(__instance);
+            UnitBattleDataModel targetBattleModel = LogueBookModels.playerBattleModel?
+                .Find(model => model?.unitData == targetUnit);
+            if (targetUnit == null || targetBattleModel == null)
+            {
+                Debug.LogWarning("[RMR] EquipBookForUI could not resolve the selected realization librarian.");
+                __result = false;
+                return false;
+            }
+            int num = LogueBookModels.playerBattleModel.IndexOf(targetBattleModel);
             if (newBook != null)
             {
-                __instance.Log("newBook not null");
-                LogueBookModels.EquipNewPage(LogueBookModels.playerBattleModel.Find((Predicate<UnitBattleDataModel>)(x => x.unitData == __instance)), newBook.ClassInfo);
-                LogueBookModels.RemoveEquip(__instance);
-                newBook.SetOwner(__instance);
+                targetUnit.Log("newBook not null");
+                LogueBookModels.EquipNewPage(targetBattleModel, newBook.ClassInfo);
+                LogueBookModels.RemoveEquip(targetUnit);
+                newBook.SetOwner(targetUnit);
                 __result = true;
                 return false;
             }
-            __instance.Log("newBook null");
-            LogueBookModels.EquipNewPage(LogueBookModels.playerBattleModel.Find((Predicate<UnitBattleDataModel>)(x => x.unitData == __instance)), LogueBookModels.BaseXmlInfo);
+            targetUnit.Log("newBook null");
+            LogueBookModels.EquipNewPage(targetBattleModel, LogueBookModels.BaseXmlInfo);
             if (num != 0)
             {
-                __instance.bookItem.ClassInfo.CharacterSkin[0] = "KetherLibrarian";
-                typeof(BookModel).GetField("_selectedOriginalSkin", AccessTools.all).SetValue(__instance.bookItem, __instance.bookItem.ClassInfo.CharacterSkin[0]);
-                typeof(BookModel).GetField("_characterSkin", AccessTools.all).SetValue(__instance.bookItem, __instance.bookItem.ClassInfo.CharacterSkin[0]);
+                targetUnit.bookItem.ClassInfo.CharacterSkin[0] = "KetherLibrarian";
+                typeof(BookModel).GetField("_selectedOriginalSkin", AccessTools.all).SetValue(targetUnit.bookItem, targetUnit.bookItem.ClassInfo.CharacterSkin[0]);
+                typeof(BookModel).GetField("_characterSkin", AccessTools.all).SetValue(targetUnit.bookItem, targetUnit.bookItem.ClassInfo.CharacterSkin[0]);
             }
-            LogueBookModels.RemoveEquip(__instance);
+            LogueBookModels.RemoveEquip(targetUnit);
             __result = true;
             return false;
         }
@@ -4474,20 +4534,11 @@ namespace abcdcode_LOGLIKE_MOD
           ref BookModel __result,
           int bookInstanceId)
         {
-            if (!LogLikeMod.CheckStage())
+            if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return;
-            BookModel bookModel = LogueBookModels.booklist.Find(x => x.instanceId == bookInstanceId);
+            BookModel bookModel = FindRoguelikeBookByInstanceId(bookInstanceId);
             if (bookModel != null)
-            {
                 __result = bookModel;
-            }
-            else
-            {
-                BookModel bookItem = LogueBookModels.playerModel.Find(x => x.bookItem.instanceId == bookInstanceId).bookItem;
-                if (bookItem == null)
-                    return;
-                __result = bookItem;
-            }
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(BookInventoryModel), nameof(BookInventoryModel.GetBookByInstanceId))]
@@ -4495,31 +4546,40 @@ namespace abcdcode_LOGLIKE_MOD
           ref BookModel __result,
           int bookInstanceId)
         {
-            if (!LogLikeMod.CheckStage())
+            if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return;
-            BookModel bookModel = LogueBookModels.booklist.Find(x => x.instanceId == bookInstanceId);
+            BookModel bookModel = FindRoguelikeBookByInstanceId(bookInstanceId);
             if (bookModel != null)
-            {
                 __result = bookModel;
-            }
-            else
-            {
-                BookModel bookItem = LogueBookModels.playerModel.Find(x => x.bookItem.instanceId == bookInstanceId).bookItem;
-                if (bookItem == null)
-                    return;
-                __result = bookItem;
-            }
+        }
+
+        private static BookModel FindRoguelikeBookByInstanceId(int bookInstanceId)
+        {
+            BookModel inventoryBook = LogueBookModels.booklist?
+                .Find(book => book != null && book.instanceId == bookInstanceId);
+            if (inventoryBook != null)
+                return inventoryBook;
+            UnitDataModel unit = LogueBookModels.playerModel?
+                .Find(model => model?.bookItem != null && model.bookItem.instanceId == bookInstanceId);
+            return unit?.bookItem;
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(BookInventoryModel), nameof(BookInventoryModel.GetBookListAll))]
         public static void BookInventoryModel_GetBookListAll(ref List<BookModel> __result)
         {
-            if (!LogLikeMod.CheckStage())
+            if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return;
             List<BookModel> bookModelList = new List<BookModel>();
-            foreach (UnitDataModel unitDataModel in LogueBookModels.playerModel)
-                bookModelList.Add(unitDataModel.defaultBook);
-            bookModelList.AddRange(LogueBookModels.booklist);
+            if (LogueBookModels.playerModel != null)
+            {
+                foreach (UnitDataModel unitDataModel in LogueBookModels.playerModel)
+                {
+                    if (unitDataModel?.defaultBook != null)
+                        bookModelList.Add(unitDataModel.defaultBook);
+                }
+            }
+            if (LogueBookModels.booklist != null)
+                bookModelList.AddRange(LogueBookModels.booklist.Where(book => book != null));
             __result = bookModelList;
         }
 
@@ -4528,11 +4588,14 @@ namespace abcdcode_LOGLIKE_MOD
           ref List<BookModel> __result,
           BookModel booktobeEquiped)
         {
-            if (!LogLikeMod.CheckStage())
+            // A Floor Realization is a vanilla stage id, so CheckStage() is false even
+            // though RMR has replaced booklist with the permanent Compendium projection.
+            // Falling through here exposes the entire vanilla library as passive sources.
+            if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return;
             List<BookModel> bookModelList1 = new List<BookModel>();
-            List<BookModel> bookModelList2 = new List<BookModel>();
-            bookModelList2.AddRange((IEnumerable<BookModel>)LogueBookModels.booklist);
+            List<BookModel> bookModelList2 =
+                RMRPrepareRestrictions.FilterEquipInventoryBooks(LogueBookModels.booklist);
             foreach (BookModel bookModel in bookModelList2)
             {
                 if (bookModel.owner == null && bookModel.GetPassiveInfoList().Count != 0)
@@ -5377,6 +5440,9 @@ namespace abcdcode_LOGLIKE_MOD
         {
             if (__instance == null || data == null || !LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return;
+            UnitDataModel targetUnit = ResolveRoguelikeUnitData(data);
+            if (targetUnit == null)
+                return;
             // Vanilla may hand this panel an equivalent realization UnitDataModel rather
             // than the exact object stored in playerModel. Context is the authoritative
             // guard; requiring reference identity made passive succession unclickable.
@@ -5388,9 +5454,9 @@ namespace abcdcode_LOGLIKE_MOD
             try { LogLikeMod.RepairTmpFontsUnder(__instance.gameObject, "LibrarianInfoPanel.SetData"); }
             catch { /* never block the prep screen */ }
             LogLikeRoutines.ForceUnlockBattleSettingLoadoutSlots(__instance);
-            __instance.PassiveListSelectable.SubmitEvent.AddListener((UnityAction<BaseEventData>)(e => UIPassiveSuccessionPopup.Instance.SetData(data, (UIPassiveSuccessionPopup.ApplyEvent)(() =>
+            __instance.PassiveListSelectable.SubmitEvent.AddListener((UnityAction<BaseEventData>)(e => UIPassiveSuccessionPopup.Instance.SetData(targetUnit, (UIPassiveSuccessionPopup.ApplyEvent)(() =>
             {
-                __instance.passiveSlotsPanel.SetStatsDataInEquipBook(data.bookItem);
+                __instance.passiveSlotsPanel.SetStatsDataInEquipBook(targetUnit.bookItem);
                 (UI.UIController.Instance.GetUIPanel(UIPanelType.BattleSetting) as UIBattleSettingPanel).EditPanel.EquipPagePanel.ChangeEquipBook(null);
                 UIControlManager.Instance.SelectSelectableForcely(__instance.PassiveListSelectable);
                 // Realization loadouts are temporary projections and must not overwrite
@@ -5398,6 +5464,22 @@ namespace abcdcode_LOGLIKE_MOD
                 if (!RMRRealizationManager.IsRealizationPreparationActive)
                     LoguePlayDataSaver.SavePlayData_Menu();
             }))));
+        }
+
+        private static UnitDataModel ResolveRoguelikeUnitData(UnitDataModel candidate)
+        {
+            if (candidate == null || LogueBookModels.playerModel == null)
+                return candidate;
+            UnitDataModel exact = LogueBookModels.playerModel
+                .Find(unit => ReferenceEquals(unit, candidate));
+            if (exact != null)
+                return exact;
+            if (candidate.bookItem == null)
+                return candidate;
+            List<UnitDataModel> matches = LogueBookModels.playerModel
+                .FindAll(unit => unit?.bookItem != null
+                    && unit.bookItem.instanceId == candidate.bookItem.instanceId);
+            return matches.Count == 1 ? matches[0] : candidate;
         }
 
         /// <summary>

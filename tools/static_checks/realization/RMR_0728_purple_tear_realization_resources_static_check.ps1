@@ -42,10 +42,10 @@ Assert-Match $purple 'RemoveAll\(x => x\.Sephirah == Singleton<StageController>\
 Assert-NoMatch $purple 'RemoveAll\(x => x\.Sephirah != Singleton<StageController>\.Instance\.CurrentFloor\)' `
     'Purple Tear transition must not keep only the current floor.'
 
-# Realization librarians are RMR-projected units. Preserve vanilla emotion-coin
-# semantics, but explicitly give those projected units the normal realization cap.
-Assert-Match $patches 'InRealizationBattle\)\s*\{\s*self\.SetMaxEmotionLevel\(5\);\s*return orig\(self, coinType, count\);' `
-    'Realization combat must gain vanilla emotion coins with max emotion level 5.'
+# Realization librarians are RMR-projected units whose saved OwnerSephirah may not
+# exist in the vanilla realization StageModel. Avoid vanilla's null-floor early return.
+Assert-Match $patches 'InRealizationBattle\)[\s\S]*?faction == Faction\.Player[\s\S]*?return CreateRmrEmotionCoins\(\s*self,\s*coinType,\s*count,\s*5\s*\);[\s\S]*?return orig\(self, coinType, count\);' `
+    'Realization librarians must use RMR emotion accumulation at level 5 while enemies keep vanilla behavior.'
 
 # Realization must use the permanent Compendium resource pools, not the current route.
 Assert-Match $patches 'if \(!RMRRealizationManager\.RealizationCombatLive\)\s*PrepareRealizationCombatResources\(self\)' `

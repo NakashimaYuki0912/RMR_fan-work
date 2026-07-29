@@ -77,7 +77,7 @@ namespace RogueLike_Mod_Reborn
         public const string packageId = "abcdcodecalmmagma.LogueLikeReborn";
         public static CustomMapHandler RMRMapHandler;
 
-        public const string BuildTimestamp = "2026-07-28Tyesod-stage-scope-defeat-save-fix+08:00";
+        public const string BuildTimestamp = "2026-07-29Trealization-ego-emotion-fix+08:00";
 
         #endregion
 
@@ -1030,23 +1030,36 @@ namespace RogueLike_Mod_Reborn
 
         private static bool EnsureBlackSilenceCorePageForUrbanStar()
         {
+            return EnsureBlackSilenceCorePage("Urban Star entry");
+        }
+
+        public static bool GrantBlackSilenceVictoryReward()
+        {
+            bool confirmed = EnsureBlackSilenceCorePage("Black Silence victory");
+            if (confirmed)
+                LogueBookModels.SavePermanentCompendiumUnlocks();
+            return confirmed;
+        }
+
+        private static bool EnsureBlackSilenceCorePage(string context)
+        {
             if (!TryResolveBlackSilenceCorePage(out BookXmlInfo blackSilence, out string resolveReason))
             {
-                Debug.LogError($"[RMR] EnsureBlackSilenceCorePageForUrbanStar: cannot resolve Black Silence --{resolveReason}");
+                Debug.LogError($"[RMR] {context}: cannot resolve Black Silence --{resolveReason}");
                 return false;
             }
             bool bsInAtlasNow = LogueBookModels.TryAddUniqueRoleBookToInventoryAndCompendium(blackSilence.id);
             if (bsInAtlasNow)
-                Debug.Log($"[RMR] Grade6 special: granted Black Silence core page {blackSilence.id.packageId}:{blackSilence.id.id} (TextId={blackSilence.TextId}, InnerName={blackSilence.InnerName ?? "?"}).");
+                Debug.Log($"[RMR] {context}: granted Black Silence core page {blackSilence.id.packageId}:{blackSilence.id.id} (TextId={blackSilence.TextId}, InnerName={blackSilence.InnerName ?? "?"}).");
             bool bsInBooklist = EnsureRoleBookInCurrentBooklist(blackSilence.id);
 
             if (HasRoleBookInBothCompendiumAndBooklist(blackSilence))
             {
-                Debug.Log("[RMR] Urban Star entry: Black Silence confirmed in atlas and current route. Binah remains gated by the Red Mist challenge.");
-                return bsInAtlasNow || bsInBooklist;
+                Debug.Log($"[RMR] {context}: Black Silence confirmed in compendium and current route. Binah remains gated by the Red Mist challenge.");
+                return true;
             }
 
-            Debug.LogError($"[RMR] EnsureBlackSilenceCorePageForUrbanStar: failed to confirm Black Silence. atlasAdded={bsInAtlasNow}, booklist={bsInBooklist}.");
+            Debug.LogError($"[RMR] {context}: failed to confirm Black Silence. compendiumAdded={bsInAtlasNow}, booklist={bsInBooklist}.");
             return false;
         }
 
@@ -1125,7 +1138,8 @@ namespace RogueLike_Mod_Reborn
 
         public static bool ShouldRecordRoleBookInPermanentCompendium(BookXmlInfo page)
         {
-            return !IsBinahCorePage(page);
+            return !IsBinahCorePage(page)
+                || RMRAbnormalityUnlockManager.IsRedMistChallengeVictoryRecorded();
         }
 
         public static void PrepareBinahForRedMistChallenge()
@@ -1154,9 +1168,12 @@ namespace RogueLike_Mod_Reborn
 
             EnsureRoleBookInCurrentBooklist(binah.id);
             RMRAbnormalityUnlockManager.UnlockBinahForCurrentRoute();
-            if (LogueBookModels.CompendiumUnlockedRoleBooks != null && LogueBookModels.CompendiumUnlockedRoleBooks.Remove(binah.id))
-                LogueBookModels.SavePermanentCompendiumUnlocks();
-            Debug.Log($"[RMR] Red Mist challenge victory: Binah core page {binah.id} unlocked for the current route.");
+            LogueBookModels.EnsureCompendiumUnlocks();
+            bool wasRecorded = LogueBookModels.CompendiumUnlockedRoleBooks.Contains(binah.id);
+            LogueBookModels.TryAddUniqueRoleBookToInventoryAndCompendium(binah.id);
+            if (!wasRecorded && LogueBookModels.CompendiumUnlockedRoleBooks.Contains(binah.id))
+                LogueBookModels.SavePermanentCompendiumData();
+            Debug.Log($"[RMR] Red Mist challenge victory: Binah core page {binah.id} unlocked for the current route and permanent Compendium.");
         }
 
         public static void ApplyBinahRedMistProgressionState()
@@ -1172,15 +1189,29 @@ namespace RogueLike_Mod_Reborn
             if (IsBinahRedMistChallengeUnlocked())
             {
                 EnsureRoleBookInCurrentBooklist(binah.id);
-                if (LogueBookModels.CompendiumUnlockedRoleBooks != null && LogueBookModels.CompendiumUnlockedRoleBooks.Remove(binah.id))
-                    LogueBookModels.SavePermanentCompendiumUnlocks();
+                LogueBookModels.EnsureCompendiumUnlocks();
+                bool wasRecorded = LogueBookModels.CompendiumUnlockedRoleBooks.Contains(binah.id);
+                LogueBookModels.TryAddUniqueRoleBookToInventoryAndCompendium(binah.id);
+                if (!wasRecorded && LogueBookModels.CompendiumUnlockedRoleBooks.Contains(binah.id))
+                    LogueBookModels.SavePermanentCompendiumData();
                 return;
             }
 
-            bool atlasChanged = LogueBookModels.CompendiumUnlockedRoleBooks != null
-                && LogueBookModels.CompendiumUnlockedRoleBooks.Remove(binah.id);
+            LogueBookModels.EnsureCompendiumUnlocks();
+            bool permanentUnlocked = RMRAbnormalityUnlockManager.IsRedMistChallengeVictoryRecorded();
+            bool atlasChanged;
+            if (permanentUnlocked)
+            {
+                int before = LogueBookModels.CompendiumUnlockedRoleBooks.Count;
+                LogueBookModels.RecordCompendiumRoleBook(binah.id);
+                atlasChanged = LogueBookModels.CompendiumUnlockedRoleBooks.Count != before;
+            }
+            else
+            {
+                atlasChanged = LogueBookModels.CompendiumUnlockedRoleBooks.Remove(binah.id);
+            }
             if (atlasChanged)
-                LogueBookModels.SavePermanentCompendiumUnlocks();
+                LogueBookModels.SavePermanentCompendiumData();
 
             if (LogLikeMod.curstageid == new LorId(LogLikeMod.ModId, RedMistChallengeStageId))
             {

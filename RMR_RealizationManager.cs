@@ -1619,6 +1619,7 @@ namespace RogueLike_Mod_Reborn
             if (LogueBookModels.CompendiumUnlockedBattleCards == null)
                 LogueBookModels.CompendiumUnlockedBattleCards = new HashSet<LorId>();
             EnsureDefaultRealizationCompendiumUnlocks();
+            LogueBookModels.RestoreCompendiumUpgradeDefinitions();
 
             // --- Save full route state ---
             RouteBookSnapshot = LogueBookModels.booklist == null ? new List<BookModel>() : new List<BookModel>(LogueBookModels.booklist);
@@ -1679,7 +1680,7 @@ namespace RogueLike_Mod_Reborn
             List<DiceCardItemModel> atlasCards = new List<DiceCardItemModel>();
             foreach (LorId id in LogueBookModels.CompendiumUnlockedBattleCards)
             {
-                DiceCardXmlInfo card = ItemXmlDataList.instance.GetCardItem(id, true);
+                DiceCardXmlInfo card = RewardingModel.GetCardItemOriginAware(id);
                 // EGO combat pages must never enter the realization deck inventory —
                 // they are unusable as normal combat pages and block deck slots.
                 if (card == null || !RMRPrepareRestrictions.IsAllowedInCombatDeckInventory(card))

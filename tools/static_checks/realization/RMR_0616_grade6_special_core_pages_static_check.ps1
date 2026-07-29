@@ -21,6 +21,8 @@ function AssertNotContains($label, $text, $needle) {
 
 $core = Read-Text 'RMR_Core.cs'
 $books = Read-Text ('abcdcode_LOGLIKE_MOD' + $bs + 'LogueBookModels.cs')
+$unlocks = Read-Text 'RMR_AbnormalityUnlocks.cs'
+$restrictions = Read-Text 'RMR_PrepareRestrictions.cs'
 
 # 1. Grade6 special core page grant helper exists
 AssertContains 'RMR_Core has GrantGrade6SpecialCorePagesIfNeeded method' $core 'GrantGrade6SpecialCorePagesIfNeeded'
@@ -39,23 +41,26 @@ AssertContains 'Binah resolution exists' $core 'Binah'
 AssertContains 'Uses BookXmlList.GetList()' $core 'BookXmlList>.Instance.GetList()'
 AssertNotContains 'Must not modify AddData/EquipPage XML to forge pages' $core 'AddData/EquipPage'
 
-# 5. Uses LogueBookModels helper (TryAddUniqueRoleBookToInventoryAndAtlas) and ensures RecordAtlasRoleBook
-AssertContains 'TryAddUniqueRoleBookToInventoryAndAtlas used' $core 'TryAddUniqueRoleBookToInventoryAndAtlas'
-AssertContains 'TryAddUniqueRoleBookToInventoryAndAtlas includes RecordAtlasRoleBook' $books 'RecordAtlasRoleBook(id)'
-AssertContains 'TryAddUniqueRoleBookToInventoryAndAtlas checks atlas duplicate' $books 'AtlasUnlockedRoleBooks.Contains(id)'
-AssertContains 'TryAddUniqueRoleBookToInventoryAndAtlas checks booklist duplicate' $books 'booklist.Any'
-AssertContains 'TryAddUniqueRoleBookToInventoryAndAtlas validates BookXmlInfo' $books 'GetData(id)'
+# 5. Uses the current permanent Compendium helper and preserves the current-route copy.
+AssertContains 'TryAddUniqueRoleBookToInventoryAndCompendium used' $core 'TryAddUniqueRoleBookToInventoryAndCompendium'
+AssertContains 'TryAddUniqueRoleBookToInventoryAndCompendium checks Compendium duplicate' $books 'CompendiumUnlockedRoleBooks.Contains(id)'
+AssertContains 'TryAddUniqueRoleBookToInventoryAndCompendium checks booklist duplicate' $books 'booklist.Any'
+AssertContains 'TryAddUniqueRoleBookToInventoryAndCompendium validates BookXmlInfo' $books 'GetBookDataOriginAware(id)'
 
-# 6. One-time flag / dedup to prevent duplicate grants
+# 6. Red Mist victory records both Gebura and Binah; Argalia resolves to the player page.
+AssertContains 'Red Mist victory records Gebura core page' $unlocks 'TryAddUniqueRoleBookToInventoryAndCompendium(redMistBookId)'
+AssertContains 'Red Mist victory records Binah core page' $core 'TryAddUniqueRoleBookToInventoryAndCompendium(binah.id)'
+AssertContains 'Argalia player core page id is explicit' $core 'BlueReverberationPlayerCorePageId = 260005'
+AssertContains 'Urban Star special core page classifier exists' $books 'IsUrbanStarSpecialCorePage'
+AssertContains 'Realization chapter filter uses special core classifier' $restrictions 'IsUrbanStarSpecialCorePage(book)'
+
+# 7. One-time flag / dedup to prevent duplicate grants
 AssertContains 'Permanent save flag constant exists' $core 'Grade6SpecialCorePagesGrantedSaveName'
 AssertContains 'One-time flag check before grant' $core 'RMR_Grade6SpecialCorePagesGranted'
 
-# 7. Does not reference _release_packages
+# 8. Does not reference _release_packages
 AssertNotContains 'RMR_Core must not reference _release_packages' $core '_release_packages'
 AssertNotContains 'LogueBookModels must not reference _release_packages' $books '_release_packages'
-
-# 8. Does not change RewardingModel.cs / LogLikePatches.cs reward logic
-# (verified by design: this PR only touches RMR_Core.cs and LogueBookModels.cs)
 
 Write-Host 'RMR 0616 grade6 special core pages static check passed — all constraints verified.'
 

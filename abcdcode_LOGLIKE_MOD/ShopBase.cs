@@ -440,7 +440,7 @@ namespace abcdcode_LOGLIKE_MOD
             {
                 foreach (LorId cardId in dropTable.cardIdList)
                 {
-                    DiceCardXmlInfo cardItem = ItemXmlDataList.instance.GetCardItem(cardId, true);
+                    DiceCardXmlInfo cardItem = RewardingModel.GetCardItemOriginAware(cardId);
                     if (cardItem != null)
                         allCards.Add(cardItem);
                 }

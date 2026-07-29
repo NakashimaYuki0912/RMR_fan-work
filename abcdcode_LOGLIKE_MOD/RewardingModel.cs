@@ -316,9 +316,9 @@ namespace abcdcode_LOGLIKE_MOD
             name = null;
             if (book == null)
                 return false;
-            if (book.id != null && KnownBookNameOverrides.TryGetValue(book.id.id, out name))
+            if (book.TextId > 0 && KnownBookNameOverrides.TryGetValue(book.TextId, out name))
                 return true;
-            return book.TextId > 0 && KnownBookNameOverrides.TryGetValue(book.TextId, out name);
+            return book.id != null && KnownBookNameOverrides.TryGetValue(book.id.id, out name);
         }
         #endregion
 
@@ -597,6 +597,36 @@ namespace abcdcode_LOGLIKE_MOD
                 return knownName;
             }
 
+            // TextId is the canonical Books.txt identity. A book's numeric ID can
+            // legitimately collide with another page's localization key (for example,
+            // Myo book 250024 uses TextId 250030 while Books.txt 250024 is Rhino).
+            // Return a usable TextId name before considering numeric book-ID aliases.
+            if (book.TextId > 0)
+            {
+                var textIdCandidates = new List<string>();
+                void ConsiderTextId(string name)
+                {
+                    if (!string.IsNullOrEmpty(name)
+                        && !string.Equals(name, "ModNeeded", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(name, "Not Found", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(name, "Not found", StringComparison.OrdinalIgnoreCase))
+                        textIdCandidates.Add(name);
+                }
+
+                ConsiderTextId(Singleton<BookDescXmlList>.Instance.GetBookName(new LorId(book.TextId)));
+                if (book.id != null && !IsOriginPackage(book.id.packageId))
+                    ConsiderTextId(Singleton<BookDescXmlList>.Instance.GetBookName(new LorId(book.id.packageId, book.TextId)));
+
+                string textIdBest = PickBestDisplayName(textIdCandidates);
+                if (!string.IsNullOrEmpty(textIdBest) && !IsPoorDisplayName(textIdBest))
+                {
+                    string textIdResult = SanitizeDisplayText(textIdBest);
+                    if (cacheKey != null)
+                        BookNameCache[cacheKey] = textIdResult;
+                    return textIdResult;
+                }
+            }
+
             List<string> candidates = new List<string>();
             void Consider(string name)
             {
@@ -617,14 +647,6 @@ namespace abcdcode_LOGLIKE_MOD
                 }
                 // Bare numeric id (origin dictionary) — shared vanilla keypages.
                 Consider(Singleton<BookDescXmlList>.Instance.GetBookName(new LorId(book.id.id)));
-            }
-
-            // TextId is often the real Books.txt key (e.g. book 211003 → TextId 23).
-            if (book.TextId > 0)
-            {
-                Consider(Singleton<BookDescXmlList>.Instance.GetBookName(new LorId(book.TextId)));
-                if (book.id != null && !IsOriginPackage(book.id.packageId))
-                    Consider(Singleton<BookDescXmlList>.Instance.GetBookName(new LorId(book.id.packageId, book.TextId)));
             }
 
             if (!string.IsNullOrEmpty(book.InnerName)
