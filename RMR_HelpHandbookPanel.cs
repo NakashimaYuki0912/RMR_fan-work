@@ -61,175 +61,154 @@ namespace RogueLike_Mod_Reborn
                 new Page
                 {
                     NavKey = "ui_RMR_Help_Nav_Overview",
-                    NavZh = "玩法概览",
-                    NavEn = "Overview",
+                    NavZh = "基础流程",
+                    NavEn = "Core Flow",
                     BodyKey = "ui_RMR_Help_Body_Overview",
                     ArtKeys = new[] { "随机事件背景1", "MysteryButton_Enable", "Shop_CardUpgrade_Icon" },
                     BodyZh =
-                        "欢迎来到 Roguelike Mod Reborn。在这里，每次接待都将成为一段从都市传闻逐步走向杂质的独立旅程。\n\n" +
-                        "开始正常游玩后，你会获得初始资源，并在不同类型的路线节点之间作出选择。每次战斗、补给与事件都会改变当前队伍，逐渐形成这一局独有的构筑。\n\n" +
-                        "击败章节 Boss 可以进入更危险的都市阶段。最终击败杂质章节 Boss，即可完成本次旅程。\n\n" +
-                        "路线中的金币、库存和章节进度只属于当前旅程；图鉴与楼层解放记录则会永久保留，为之后的游玩提供更多选择。",
+                        "【核心结构】\n" +
+                        "本模组采用漏斗式关卡分布。前期资源较少、战斗压力较低、流程更紧凑，帮助玩家快速完成初期构筑；随着流程推进，关卡数量、敌人强度与构筑要求逐步提高，奖励种类和质量也会随之变化。\n\n" +
+                        "【路线选择】\n" +
+                        "玩家需要在普通战斗、异想体战斗、Boss 战、商店、休息与特殊事件之间选择下一站，并根据当前队伍、书页构筑和资源规划后续路线。\n\n" +
+                        "【节点与楼层】\n" +
+                        "第一、第二章不会生成异想体战斗节点，相关位置会改为休息节点。准备界面切换楼层只会改变地图主题与背景音乐，不会改变队伍，也不消耗接待次数。\n\n" +
+                        "【旅程终点】\n" +
+                        "每次流程都会从较低都市阶段逐步推进。击败章节 Boss 后进入下一阶段，最终击败杂质阶段 Boss 即完成本次旅程。",
                     BodyEn =
-                        "Welcome to Roguelike Mod Reborn. Every reception becomes its own journey, running from Urban Myth all the way to Impuritas Civitatis.\n\n" +
-                        "Start a normal run and you receive your opening resources, then choose between route nodes of different kinds. Every battle, supply stop, and event reshapes the team, and the build that emerges belongs to that run alone.\n\n" +
-                        "Defeating a chapter boss moves you into a more dangerous stage of the City. Defeating the Impuritas Civitatis boss completes the journey.\n\n" +
-                        "Money, inventory, and chapter progress belong to the current run only. Compendium discoveries and Floor Realization clears are kept permanently and widen your options in later journeys."
-                },
-                new Page
-                {
-                    NavKey = "ui_RMR_Help_Nav_Route",
-                    NavZh = "路线与章节",
-                    NavEn = "Route & Chapters",
-                    BodyKey = "ui_RMR_Help_Body_Route",
-                    ArtKeys = new[] { "随机事件背景3", "Stage_Rest", "Stage_Shop" },
-                    BodyZh =
-                        "每次完成当前节点后，你都可以从若干候选节点中选择下一站。不同路线会带来不同的战斗强度、奖励与风险。\n\n" +
-                        "【普通战】\n旅程中最常见的战斗。适合稳定获取书页、被动和金币，并逐步完善队伍。\n\n" +
-                        "【精英战】\n敌人更强，但奖励通常也更好。队伍尚未成形时，需要谨慎判断是否挑战。\n\n" +
-                        "【Boss 战】\n击败章节 Boss 后，旅程将进入下一章节，并开放更高等级的敌人、奖励与商品。\n\n" +
-                        "【异想体战】\n挑战异想体并获得对应书页。第一、第二章不会生成异想体战斗节点，相关位置会由休息节点替代。\n\n" +
-                        "【商店、休息与神秘事件】\n这些节点提供购买、恢复或特殊选择。合理利用它们，往往比连续战斗更重要。\n\n" +
-                        "击败杂质章节 Boss 后，本次旅程正式结束。\n\n" +
-                        "【关于楼层选择】\n准备界面可以任意切换生命之树上的楼层。本模组中这只改变地图主题与背景音乐，不会改变队伍阵容，也不消耗任何接待次数，可以随时来回切换。",
-                    BodyEn =
-                        "After each node you choose your next stop from several candidates. Different routes mean different difficulty, rewards, and risk.\n\n" +
-                        "[Normal Battle]\nThe most common encounter. A steady source of pages, passives, and money while your team takes shape.\n\n" +
-                        "[Elite Battle]\nStronger enemies, usually better rewards. Judge carefully while your build is still incomplete.\n\n" +
-                        "[Boss Battle]\nClearing a chapter boss advances the journey and unlocks higher-tier enemies, rewards, and shop stock.\n\n" +
-                        "[Abnormality Battle]\nFight an abnormality for its pages. These nodes do not appear in Chapters 1 and 2 — those positions become Rest nodes instead.\n\n" +
-                        "[Shop, Rest, and Mystery]\nThese offer purchases, recovery, or special choices. Using them well often matters more than another fight.\n\n" +
-                        "Defeating the Impuritas Civitatis boss ends the journey.\n\n" +
-                        "[About floor selection]\nYou may switch floors on the Sephirah tree freely in the prep screen. In this mod that only changes the map theme and background music — it never changes your team and never consumes a reception, so switch back and forth as you like."
+                        "[Core structure]\nRMR uses a funnel-shaped route. Early stages are short and relatively forgiving while resources are scarce; later stages expand the route, strengthen enemies, and demand a more complete build while offering broader and better rewards.\n\n" +
+                        "[Route choices]\nChoose among normal battles, abnormality battles, bosses, shops, rests, and mysteries according to your team, pages, and resources.\n\n" +
+                        "[Nodes and floors]\nChapters 1 and 2 replace abnormality-battle nodes with rests. Switching floors in preparation only changes the map theme and music; it does not change the team or consume a reception.\n\n" +
+                        "[Journey's end]\nDefeating each chapter boss advances the run. Defeating the Impuritas Civitatis boss completes the journey."
                 },
                 new Page
                 {
                     NavKey = "ui_RMR_Help_Nav_Rewards",
-                    NavZh = "战斗与构筑",
-                    NavEn = "Combat & Builds",
+                    NavZh = "关卡奖励",
+                    NavEn = "Stage Rewards",
                     BodyKey = "ui_RMR_Help_Body_Rewards",
-                    ArtKeys = new[] { "异想体战斗", "Shop_CardUpgrade_Icon" },
+                    ArtKeys = new[] { "异想体战斗", "随机事件背景3", "Shop_CardUpgrade_Icon" },
                     BodyZh =
-                        "战斗仍遵循《废墟图书馆》的基本规则。配置核心书页、战斗书页与被动能力，并通过拼点、光芒和情感等级赢得接待。\n\n" +
-                        "胜利后可能获得核心书页、战斗书页、被动、异想体书页、E.G.O.、金币或特殊奖励。这些内容会进入当前路线库存。\n\n" +
-                        "战斗书页按照“种类”记录。升级后，强化版本会替换原版本；重复升级会逐渐提高费用。\n\n" +
-                        "战斗中的情感选书只会从当前路线已经拥有的异想体书页中产生，并按队伍情感等级筛选页阶。详见「情感与书页阶级」一节。\n\n" +
-                        "中途 E.G.O.选择同样只会从当前路线已经拥有的 E.G.O.中产生。未获得的内容不会提前进入本局选择池。\n\n" +
-                        "被动能力可以在准备界面通过「被动能力转移」在司书之间调整。核心书页决定基础属性与专属被动，战斗书页决定实际出牌。",
+                        "【奖励种类】\n" +
+                        "关卡奖励包括战斗书页、核心书页、异想体书页、被动能力与 E.G.O.战斗书页，不同关卡使用不同的奖励规则。\n\n" +
+                        "【普通关卡】\n" +
+                        "普通关卡可获得战斗书页、核心书页与异想体书页。异想体书页池会随流程阶段累积扩充：传闻至都市传说开放历史、艺术、科技、文学层；都市恶疾至都市梦魇追加语言、自然、社会层；都市之星至杂质再追加宗教、总类、哲学层。已进入池中的书页不会在后续阶段退出。\n\n" +
+                        "【战斗书页与升级】\n" +
+                        "战斗书页按“种类”获得，而不是按单张库存计算；升级也对整个书页种类生效。\n\n" +
+                        "【情感选书与 E.G.O.】\n" +
+                        "战斗中的异想体书页只会从当前路线已经拥有的内容中产生：队伍情感 1–2 对应 I 阶，3–4 对应 II 阶，5 对应 III 阶。页名后缀数字不是阶级；中途 E.G.O.同样只会出现当前路线已经拥有的内容。\n\n" +
+                        "【异想体战斗】\n" +
+                        "异想体战斗不提供战斗书页和核心书页，改为连续进行三次异想体书页选择，用于快速扩充收集并补足当前构筑。\n\n" +
+                        "【Boss 战】\n" +
+                        "Boss 战除普通基础奖励外，还可额外选择一项被动能力。完成对应楼层解放后，Boss 奖励还会加入该层专属异想体书页与 E.G.O.战斗书页。",
                     BodyEn =
-                        "Combat follows the base rules of Library of Ruina. Assign key pages, combat pages, and passives, then win receptions through clashes, Light, and Emotion Level.\n\n" +
-                        "Victory can grant key pages, combat pages, passives, abnormality pages, E.G.O., money, or special rewards. Everything goes into the current run's inventory.\n\n" +
-                        "Combat pages are tracked as page *types*. Upgrading replaces the base version with the enhanced one, and each successful upgrade raises the price of the next.\n\n" +
-                        "Mid-battle emotion picks only draw from abnormality pages this run already owns, filtered by team Emotion Level. See the Emotion & Page Tiers section.\n\n" +
-                        "Mid-battle E.G.O. choices are likewise limited to E.G.O. you already own. Nothing you have not obtained is added to the pool early."
-                },
-                new Page
-                {
-                    NavKey = "ui_RMR_Help_Nav_Emotion",
-                    NavZh = "情感与书页阶级",
-                    NavEn = "Emotion & Page Tiers",
-                    BodyKey = "ui_RMR_Help_Body_Emotion",
-                    ArtKeys = new[] { "异想体战斗", "随机事件背景3" },
-                    BodyZh =
-                        "战斗中提升队伍情感等级后，会出现异想体书页三选一。候选只来自本次路线已经获得的书页，并且严格按页阶筛选：\n\n" +
-                        "　队伍情感 1–2　→　只出 I 阶书页\n" +
-                        "　队伍情感 3–4　→　只出 II 阶书页\n" +
-                        "　队伍情感 5　　→　只出 III 阶书页\n\n" +
-                        "不同阶级不会混在同一次选择里。如果某个阶级没有符合条件的已有书页，本次就不会给出选择。\n\n" +
-                        "【常见误解：名称后缀不是阶级】\n" +
-                        "同一个异想体的三张书页，阶级并不按顺序排列。原版数据里 52 组异想体中有 50 组不是递增的。例如歌唱机的「音乐」是 III 阶，而「旋律」只是 I 阶；蝴蝶的「棺柩」是 III 阶，「哀悼」却是 I 阶。\n\n" +
-                        "因此在情感 1 拿到「哀悼」「旋律」「今日的表情」都是正常的，它们本来就是 I 阶书页。只有 III 阶书页出现在低情感才属于异常。\n\n" +
-                        "阶级以原版数据为准，与书页名称、后缀数字和获得顺序都无关。",
-                    BodyEn =
-                        "Raising the team's Emotion Level in battle offers a choice of three abnormality pages. Candidates come only from pages this run already owns, and are filtered strictly by tier:\n\n" +
-                        "　Team Emotion 1–2　→　tier I pages only\n" +
-                        "　Team Emotion 3–4　→　tier II pages only\n" +
-                        "　Team Emotion 5　　→　tier III pages only\n\n" +
-                        "Tiers are never mixed in one selection. If no owned page matches the required tier, no choice is offered that time.\n\n" +
-                        "[Common misconception: the number in a name is not the tier]\n" +
-                        "The three pages of one abnormality are not ordered by tier. In 50 of the 52 abnormality sets, they are not ascending. Singing Machine's \"Music\" is tier III while \"Melody\" is only tier I; Butterfly's \"Coffin\" is tier III while \"Mourning\" is tier I.\n\n" +
-                        "So seeing Mourning, Melody, or Today's Expression at Emotion Level 1 is correct behaviour — they are tier I pages. Only a tier III page appearing at a low Emotion Level would be a fault.\n\n" +
-                        "Tier always comes from the base game's data, never from a page's name, its trailing number, or the order you obtained it."
+                        "[Reward types]\nStages can award combat pages, key pages, abnormality pages, passives, and E.G.O. combat pages.\n\n" +
+                        "[Normal stages]\nNormal stages award combat, key, and abnormality pages. The abnormality pool grows cumulatively: the early stages use Malkuth, Netzach, Yesod, and Hod; Urban Plague/Nightmare add Gebura, Tiphereth, and Chesed; Star of the City/Impuritas add Hokma, Keter, and Binah.\n\n" +
+                        "[Combat page types]\nCombat pages are obtained and upgraded by type rather than as individual copies.\n\n" +
+                        "[Emotion picks and E.G.O.]\nMid-battle abnormality choices use only pages owned in the current route: team Emotion 1–2 selects tier I, 3–4 tier II, and 5 tier III. A page-name suffix is not its tier. Mid-battle E.G.O. choices are also limited to E.G.O. owned in the route.\n\n" +
+                        "[Abnormality battles]\nThese replace combat/key page rewards with three consecutive abnormality-page choices.\n\n" +
+                        "[Boss battles]\nBosses also offer a passive. Cleared realizations add their exclusive abnormality and E.G.O. pages to eligible boss rewards."
                 },
                 new Page
                 {
                     NavKey = "ui_RMR_Help_Nav_Shop",
-                    NavZh = "补给与事件",
-                    NavEn = "Supplies & Events",
+                    NavZh = "商店",
+                    NavEn = "Shop",
                     BodyKey = "ui_RMR_Help_Body_Shop",
                     ArtKeys = new[] { "Shop_CardUpgrade_Icon", "Stage_Shop", "随机事件背景2" },
                     BodyZh =
-                        "【商店】\n使用本次旅程获得的金币购买核心书页、战斗书页、被动、异想体书页、E.G.O.或战斗书页升级。商品受到章节、解放状态和当前库存影响。\n\n" +
-                        "购买战斗书页代表获得该书页种类。升级会用新版替换旧版，每次成功升级后，后续升级价格都会提高。\n\n" +
-                        "【休息】\n休息节点用于调整旅程节奏，为后续战斗恢复状态或获得休整机会。\n\n" +
-                        "【神秘事件】\n不同选择可能带来资源与奖励，也可能要求金币、书页或其他代价。根据当前队伍状态判断风险，也是旅程的重要部分。",
+                        "【可购买内容】\n" +
+                        "商店可购买战斗书页、核心书页、被动能力、异想体书页与 E.G.O.战斗书页，并提供战斗书页升级。商品受到章节、楼层解放状态与当前库存影响。\n\n" +
+                        "【战斗书页升级】\n" +
+                        "商店提供战斗书页升级。由于战斗书页按种类获得，升级同样对整个书页种类生效，而不是只强化一张单独书页。\n\n" +
+                        "【升级费用】\n" +
+                        "首次升级需要 10 眼。每完成一次升级，下一次费用增加 2 眼：10 → 12 → 14 → 16……\n\n" +
+                        "该数值仍可能根据资源获取速度、升级收益、商店频率、后期难度与不同构筑强度继续调整。",
                     BodyEn =
-                        "[Shop]\nSpend the money earned this journey on key pages, combat pages, passives, abnormality pages, E.G.O., or combat page upgrades. Stock depends on the chapter, your realization progress, and what you already own.\n\n" +
-                        "Buying a combat page grants that page type. An upgrade replaces the old version with the new one, and every successful upgrade raises the price of the next.\n\n" +
-                        "[Rest]\nRest nodes let you pace the journey — recover before the fights ahead or take a moment to regroup.\n\n" +
-                        "[Mystery]\nChoices here may bring resources and rewards, or demand money, pages, or another price. Weighing that risk against your current team is part of the run."
+                        "[Stock]\nShops sell combat pages, key pages, passives, abnormality pages, and E.G.O. combat pages, and offer combat-page upgrades. Stock depends on the chapter, realization progress, and current inventory.\n\n" +
+                        "[Combat page upgrades]\nBecause combat pages are owned by type, an upgrade strengthens that page type rather than one individual copy.\n\n" +
+                        "[Upgrade price]\nThe first upgrade costs 10 Ahn. Each successful upgrade raises the next price by 2: 10 → 12 → 14 → 16… These values may still be tuned."
                 },
                 new Page
                 {
                     NavKey = "ui_RMR_Help_Nav_Atlas",
-                    NavZh = "永久图鉴",
-                    NavEn = "Permanent Compendium",
+                    NavZh = "图鉴系统",
+                    NavEn = "Compendium",
                     BodyKey = "ui_RMR_Help_Body_Atlas",
                     ArtKeys = new[] { "随机事件背景2", "Shop_CardUpgrade_Icon" },
                     BodyZh =
-                        "旅程中获得的角色书页、战斗书页、异想体书页与 E.G.O.会逐步记录到永久图鉴中。\n\n" +
-                        "永久图鉴与当前路线库存并不相同。图鉴内容不会在新路线中自动全部加入库存，每次正常游玩仍需要重新收集和构筑。\n\n" +
-                        "永久图鉴用于记录收藏、扩展后续内容池，并为楼层解放战提供编队资源。尚未解锁的项目会以未知状态显示。\n\n" +
-                        "“重置永久进度”会清除图鉴与楼层解放记录，请谨慎使用。",
+                        "【记录内容】\n" +
+                        "战斗过程中获得的核心书页、战斗书页、异想体书页与 E.G.O.战斗书页都会记录在永久图鉴中，升级后的战斗书页效果也会同步记录。\n\n" +
+                        "【查看与收集】\n" +
+                        "玩家可以随时通过图鉴查看已收集内容的具体效果与当前升级状态。\n\n" +
+                        "【玩法用途】\n" +
+                        "图鉴不仅用于收藏，也会影响解放战与部分特殊关卡中可选择的书页。永久图鉴与当前路线库存彼此独立，新路线不会自动获得图鉴中的全部内容。\n\n" +
+                        "【路线存档】\n" +
+                        "队伍配置、库存、金币、章节进度与剩余节点只属于当前旅程；图鉴、解放战与特殊 Boss 首通记录则跨旅程保留。开局菜单只会在存在有效路线存档时显示“继续”。",
                     BodyEn =
-                        "Key pages, combat pages, abnormality pages, and E.G.O. found on a journey are gradually recorded in the permanent Compendium.\n\n" +
-                        "The Compendium is not the same thing as your current run's inventory. Its contents are not added to a new route automatically — every normal run still starts from scratch.\n\n" +
-                        "It serves as a collection record, widens the pools future runs can draw from, and supplies the loadout for Floor Realizations. Entries you have not unlocked show as unknown.\n\n" +
-                        "\"Reset permanent progress\" clears both the Compendium and your realization clear records. Use it with care."
-                },
-                new Page
-                {
-                    NavKey = "ui_RMR_Help_Nav_Save",
-                    NavZh = "存档与进度",
-                    NavEn = "Saves & Progress",
-                    BodyKey = "ui_RMR_Help_Body_Save",
-                    ArtKeys = new[] { "随机事件背景2", "MysteryButton_Enable" },
-                    BodyZh =
-                        "本模组的进度分成两类，分别保存，互不影响：\n\n" +
-                        "【当前路线】\n队伍配置、库存、金币、章节进度与剩余节点。只属于这一次旅程。\n\n" +
-                        "【永久记录】\n永久图鉴、楼层解放通关记录、特殊 Boss 首通记录。跨旅程保留。\n\n" +
-                        "【继续游玩】\n开局菜单的「继续」只在存在有效路线存档时出现。选择「正常游玩」开始新旅程会覆盖当前路线存档，但不会影响永久记录。\n\n" +
-                        "【关于更新】\n更新模组或在版本之间切换前，建议备份存档目录：\n　%USERPROFILE%\\AppData\\LocalLow\\Project Moon\\LibraryOfRuina\\LogueSave\n\n" +
-                        "更新后请完全退出并重新启动游戏，不要直接从后台恢复。\n\n" +
-                        "【读档失败时】\n如果「继续」提示存档未能完整加载，本次读取会被中止，磁盘上的存档不会被覆盖。此时可以完全重启游戏后再试一次；若仍然失败，请在反馈时附上 Player.log。",
-                    BodyEn =
-                        "Progress is kept in two separate places that never overwrite each other:\n\n" +
-                        "[Current run]\nTeam setup, inventory, money, chapter progress, and remaining nodes. Belongs to this journey only.\n\n" +
-                        "[Permanent record]\nThe Compendium, Floor Realization clears, and first-clear records for special bosses. Carried across journeys.\n\n" +
-                        "[Continue]\nThe Continue option appears only when a valid run save exists. Starting a new journey overwrites the current run save but leaves the permanent record untouched.\n\n" +
-                        "[Before updating]\nBack up your save directory before updating the mod or switching versions:\n　%USERPROFILE%\\AppData\\LocalLow\\Project Moon\\LibraryOfRuina\\LogueSave\n\n" +
-                        "After an update, fully close and restart the game rather than resuming from the background.\n\n" +
-                        "[If a load fails]\nIf Continue reports that the save could not be fully loaded, the load is aborted and the file on disk is left untouched. Restart the game completely and try again; if it still fails, please include Player.log with your report."
+                        "[Recorded content]\nKey pages, combat pages, abnormality pages, and E.G.O. combat pages obtained during play are recorded permanently. Upgraded combat-page effects are recorded as well.\n\n" +
+                        "[Viewing]\nUse the Compendium to review collected effects and current upgrade states.\n\n" +
+                        "[Gameplay use]\nCompendium unlocks determine the pages available in realizations and some special stages. The permanent Compendium remains separate from current-run inventory.\n\n" +
+                        "[Run saves]\nTeam setup, inventory, money, chapter progress, and remaining nodes belong only to the current journey. Compendium, realization, and special-boss first-clear records persist. Continue appears only when a valid run save exists."
                 },
                 new Page
                 {
                     NavKey = "ui_RMR_Help_Nav_Realization",
-                    NavZh = "解放战与提示",
-                    NavEn = "Realization & Tips",
+                    NavZh = "解放战",
+                    NavEn = "Realizations",
                     BodyKey = "ui_RMR_Help_Body_Realization",
                     ArtKeys = new[] { "异想体战斗", "随机事件背景1" },
                     BodyZh =
-                        "在开局菜单选择“挑战解放战”，选择目标楼层并使用永久图鉴配置临时队伍。\n\n" +
-                        "解放战会直接进入所选楼层的最终多阶段战斗，不需要重复前置异想体镇压。不同楼层可能拥有不同的书页章节限制。\n\n" +
-                        "首次通关会永久解锁该层专属异想体书页与 E.G.O.。已经通关的楼层可以再战，但不会重复发放首通奖励。\n\n" +
-                        "解放战临时编队不会覆盖正常路线配置。选择“正常游玩”后，本次路线期间会关闭解放入口；放弃路线并重新开始后可再次挑战。\n\n" +
-                        "可以直接开始正常路线，也可以先解放部分楼层扩充永久资源。根据每次获得的内容调整策略，正是本模组的核心玩法。",
+                        "【图鉴限制】\n" +
+                        "解放战中的核心书页、战斗书页、异想体书页与 E.G.O.战斗书页，都必须从永久图鉴已经收集的内容中选取；未记录的书页不能直接使用。\n\n" +
+                        "【章节限制】\n" +
+                        "历史、艺术、科技与文学层解放战只能使用都市梦魇及以下章节的战斗书页与核心书页，以保留对应阶段的构筑体验。\n\n" +
+                        "【首次通关奖励】\n" +
+                        "首次完成某层解放战后，该层专属异想体书页会加入后续关卡掉落池，对应 E.G.O.战斗书页会在满足条件的 Boss 战后出现。已经通关的楼层可以再战，但不会重复发放首通奖励。\n\n" +
+                        "【临时编队】\n" +
+                        "解放战使用临时编队，战后会恢复正常路线配置，不会污染当前旅程。",
                     BodyEn =
-                        "Pick \"Challenge Floor Realization\" in the start menu, choose a target floor, and build a temporary team from your permanent Compendium.\n\n" +
-                        "A realization goes straight to that floor's final multi-stage battle — there is no need to repeat the abnormality suppressions before it. Floors may impose their own page chapter restrictions.\n\n" +
-                        "A first clear permanently unlocks that floor's exclusive abnormality pages and E.G.O. Cleared floors can be replayed for practice, but first-clear rewards are never granted twice.\n\n" +
-                        "The temporary loadout never overwrites your normal run's configuration. Once you choose \"Normal Play\", the realization entrance is closed for that run; abandon the route and start over to challenge floors again.\n\n" +
-                        "You can head straight into a normal route, or clear a few floors first to widen your permanent pool. Adapting to what each run gives you is the heart of this mod."
+                        "[Compendium limit]\nAll key, combat, abnormality, and E.G.O. pages used in a realization must already be recorded in the permanent Compendium.\n\n" +
+                        "[Chapter limit]\nMalkuth, Netzach, Yesod, and Hod realizations only allow key and combat pages from Urban Nightmare or earlier.\n\n" +
+                        "[First-clear rewards]\nA first clear adds that floor's exclusive abnormality pages to later reward pools and makes its E.G.O. eligible after suitable bosses. Replays do not repeat these rewards.\n\n" +
+                        "[Temporary loadout]\nRealization teams are temporary; the normal-run setup is restored afterward."
+                },
+                new Page
+                {
+                    NavKey = "ui_RMR_Help_Nav_Special",
+                    NavZh = "特殊掉落与角色解锁",
+                    NavEn = "Special Drops & Unlocks",
+                    BodyKey = "ui_RMR_Help_Body_Special",
+                    ArtKeys = new[] { "随机事件背景3", "异想体战斗" },
+                    BodyZh =
+                        "【殷红迷雾与 Binah】\n" +
+                        "进入都市之星后，殷红迷雾有一定概率以特殊精英战形式出现。迎战时会暂时开放 Binah 的使用权限；胜利后 Binah 会加入图鉴，并可在后续战斗中继续使用。本场普通奖励则替换为殷红迷雾的核心书页与对应战斗书页。\n\n" +
+                        "【漆黑噤默】\n" +
+                        "首次通关以罗兰为 Boss 的杂质阶段后，漆黑噤默会加入图鉴。此后进入都市之星阶段时，其核心书页会自动加入本次路线的可用核心书页。\n\n" +
+                        "【阿尔加利亚】\n" +
+                        "首次通关以残响乐团为 Boss 的杂质阶段后，阿尔加利亚会加入图鉴。此后进入都市之星阶段时，其核心书页与对应战斗书页会自动加入本次路线。",
+                    BodyEn =
+                        "[The Red Mist and Binah]\nAt Star of the City, the Red Mist may appear as a special elite encounter. Binah becomes temporarily available for the fight. Victory records Binah for later battles and replaces normal rewards with the Red Mist's key and combat pages.\n\n" +
+                        "[The Black Silence]\nClear the Roland boss at Impuritas Civitatis once to record the Black Silence. Future Star of the City runs automatically add its key page to the route.\n\n" +
+                        "[Argalia]\nClear the Distorted Ensemble boss once to record Argalia. Future Star of the City runs automatically add his key and combat pages."
+                },
+                new Page
+                {
+                    NavKey = "ui_RMR_Help_Nav_Goal",
+                    NavZh = "整体流程目标",
+                    NavEn = "Overall Run Goals",
+                    BodyKey = "ui_RMR_Help_Body_Goal",
+                    ArtKeys = new[] { "MysteryButton_Enable", "Shop_CardUpgrade_Icon" },
+                    BodyZh =
+                        "【核心目标】\n" +
+                        "本玩法并不是单纯重复原版接待，而是在每次流程中不断选择、取舍与构筑。\n\n" +
+                        "【构筑方向】\n" +
+                        "你需要在获取新的战斗书页与核心书页、收集异想体书页、购买被动与其他补给、强化已有书页、挑战解放战、解锁特殊角色与 E.G.O.、完善 Boss 战构筑之间权衡资源。\n\n" +
+                        "【重复游玩】\n" +
+                        "随着流程推进，玩家能够使用的书页、遗物与特殊角色会逐步增加，并在每次旅程中形成不同的队伍与战斗方式。",
+                    BodyEn =
+                        "[Core goal]\nRMR is not simply a sequence of base-game receptions. Every run asks you to choose, trade off, and build.\n\n" +
+                        "[Build directions]\nBalance new combat and key pages, abnormality pages, passives and other supplies, upgrades, realizations, special characters, E.G.O., and preparation for later bosses.\n\n" +
+                        "[Replay]\nAs the run advances, available pages and special characters expand, letting each journey produce a different team and combat style."
                 }
             };
         }
@@ -373,6 +352,10 @@ namespace RogueLike_Mod_Reborn
                 btn.targetGraphic = img;
                 var label = MakeTmp(btnGo.transform, "L", new Vector2(18f, 0f), new Vector2(172f, 42f), 16,
                     TextAlignmentOptions.Center, T(Pages[i].NavKey, Pages[i].NavZh, Pages[i].NavEn));
+                // Keep the full player-facing category name readable in all three languages.
+                label.enableAutoSizing = true;
+                label.fontSizeMin = 12f;
+                label.fontSizeMax = 16f;
                 label.color = ColCream;
                 _navLabels.Add(label);
                 btn.onClick.AddListener(() =>
