@@ -1517,6 +1517,9 @@ namespace abcdcode_LOGLIKE_MOD
         private static int _pendingMidBattleEgoEmotionLevel;
         private static readonly HashSet<int> _midBattleEgoDoneAtLevel = new HashSet<int>();
         private static readonly HashSet<int> _midBattleSelectedEgoCardIds = new HashSet<int>();
+        private const float MidBattleChoiceInputGuardSeconds = 0.25f;
+        private static float _midBattleChoiceInputBlockedUntil = -1f;
+        private static bool _midBattleChoiceWaitForPointerRelease;
         /// <summary>True while LevelUpUI is showing a mid-battle EGO 3-pick (not post-battle queue).</summary>
         public static bool IsMidBattleEgoSelectionActive { get; private set; }
         /// <summary>
@@ -1531,8 +1534,37 @@ namespace abcdcode_LOGLIKE_MOD
             _midBattleEgoDoneAtLevel.Clear();
             _midBattleSelectedEgoCardIds.Clear();
             IsMidBattleEgoSelectionActive = false;
+            ResetMidBattleChoiceInputGuard();
             SuppressSpuriousEndBattleWhileCombatLive = false;
             NonCombatNodeExitPending = false;
+        }
+
+        private static void BeginMidBattleChoiceInputGuard()
+        {
+            _midBattleChoiceInputBlockedUntil = Time.unscaledTime + MidBattleChoiceInputGuardSeconds;
+            _midBattleChoiceWaitForPointerRelease = true;
+        }
+
+        private static void ResetMidBattleChoiceInputGuard()
+        {
+            _midBattleChoiceInputBlockedUntil = -1f;
+            _midBattleChoiceWaitForPointerRelease = false;
+        }
+
+        public static bool IsMidBattleChoiceInputGuardActive()
+        {
+            if (_midBattleChoiceInputBlockedUntil < 0f)
+                return false;
+            if (Time.unscaledTime < _midBattleChoiceInputBlockedUntil)
+                return true;
+            try
+            {
+                if (_midBattleChoiceWaitForPointerRelease && Input.GetMouseButton(0))
+                    return true;
+            }
+            catch { /* input can be unavailable during scene teardown */ }
+            ResetMidBattleChoiceInputGuard();
+            return false;
         }
         #endregion
 
@@ -1547,7 +1579,10 @@ namespace abcdcode_LOGLIKE_MOD
             IsMidBattleEgoSelectionActive = false;
             // Keep combat alive after emotion-5 EGO: do not let reward EndBattle hijack RoundEnd.
             if (wasMidBattle)
+            {
+                BeginMidBattleChoiceInputGuard();
                 SuppressSpuriousEndBattleWhileCombatLive = true;
+            }
         }
         #endregion
 
@@ -2097,6 +2132,12 @@ namespace abcdcode_LOGLIKE_MOD
         public static bool EmotionChoice()
         {
             if (SingletonBehavior<BattleManagerUI>.Instance.ui_levelup.IsEnabled)
+                return false;
+
+            // E.G.O. cards submit on pointer-down. Do not let the same physical click,
+            // a mouse bounce, or a held controller submit land on a newly-created
+            // abnormality card in the same screen position.
+            if (IsMidBattleChoiceInputGuardActive())
                 return false;
 
             // After abno UI closes at emotion 3/4/5, open E.G.O. 3-pick before resuming combat.

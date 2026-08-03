@@ -39,13 +39,26 @@ if ($loadStart -lt 0 -or $loadEnd -lt 0) {
 $loadBlock = $logLikeMod.Substring($loadStart, $loadEnd - $loadStart)
 
 Assert-Contains 'Core-page loader only scans XML files in main AddData folder' `
-    $loadBlock 'directoryInfo1\.GetFiles\s*\(\s*"\*\.xml"\s*\)'
+    $loadBlock 'EnumerateXmlFiles\s*\(\s*directoryInfo1\.FullName\s*\)'
 
 Assert-Contains 'Core-page loader only scans XML files in extension AddData folders' `
-    $loadBlock 'directoryInfo2\.GetFiles\s*\(\s*"\*\.xml"\s*\)'
+    $loadBlock 'EnumerateXmlFiles\s*\(\s*directoryInfo2\.FullName\s*\)'
 
 Assert-NotContains 'Core-page loader must not scan every file including backups' `
     $loadBlock 'GetFiles\s*\(\s*\)'
+
+$enumerateStart = $logLikeMod.IndexOf('public static FileInfo[] EnumerateXmlFiles(string directoryPath)')
+$enumerateEnd = $logLikeMod.IndexOf('#endregion', $enumerateStart)
+if ($enumerateStart -lt 0 -or $enumerateEnd -lt 0) {
+    throw 'FAIL: EnumerateXmlFiles helper block not found'
+}
+$enumerateBlock = $logLikeMod.Substring($enumerateStart, $enumerateEnd - $enumerateStart)
+
+Assert-Contains 'XML enumeration delegates to the shared extension-filtered loader' `
+    $enumerateBlock 'EnumerateDataFiles\s*\(\s*directoryPath\s*,\s*"\.xml"\s*\)'
+
+Assert-Contains 'Shared data-file enumeration filters backup-style names' `
+    $enumerateBlock 'IsRuntimeDataFileName\s*\(\s*f\.Name\s*\)'
 
 $sourceEquipPath = Join-Path $root 'AddData\EquipPage'
 $backupFiles = Get-ChildItem -LiteralPath $sourceEquipPath -File -Filter '*.bak' -ErrorAction SilentlyContinue

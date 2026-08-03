@@ -1,0 +1,15 @@
+[h2]2026-08-03 Update[/h2]
+[list]
+[*]Stabilized Floor Realization temporary librarian mapping, passive succession, and combat-deck editing.
+[*]Kept floor-specific Compendium and chapter restrictions authoritative during realization preparation.
+[*]Prevented a mid-battle E.G.O. click from selecting the next abnormality page in the same position.
+[*]Removed the withdrawn experimental realization preset interface.
+[/list]
+
+[h2]2026-08-03 更新[/h2]
+[list]
+[*]修复解放战临时司书映射、被动归属与战斗书页编辑的稳定性问题。
+[*]解放战配置继续严格遵循当前楼层的图鉴范围与章节上限。
+[*]修复中段点击 E.G.O. 后同位置异想体书页被连带选中的问题。
+[*]移除已撤回的解放战预设实验界面。
+[/list]

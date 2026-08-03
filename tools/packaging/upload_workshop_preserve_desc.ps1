@@ -12,7 +12,9 @@ param(
     [string]$SteamUser = "gffnj3",
     [string]$ChangeNote = "",
     [switch]$SkipPrepare,
-    [switch]$SkipPreview  # if set, reuse existing preview path from prior VDF (still required by steamcmd)
+    [switch]$SkipPreview,  # if set, reuse existing preview path from prior VDF (still required by steamcmd)
+    [switch]$UsePreservedMeta,  # bypass the live page when Steam Community is rate-limiting requests
+    [switch]$DryRun  # generate and validate the VDF, but do not start steamcmd
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,9 +23,13 @@ $projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
 
 function Escape-VdfString([string]$s) {
     if ($null -eq $s) { return "" }
+    # Steam KeyValues does not support JSON-style escaped quotes inside values.
+    # Reject them before writing a VDF instead of generating a file steamcmd will misparse.
+    if ($s.Contains('"')) {
+        throw 'VDF value contains an unsupported double quote.'
+    }
     # Literal replacements only (avoid PowerShell -replace regex backslash pitfalls).
     $s = $s.Replace('\', '\\')
-    $s = $s.Replace('"', '\"')
     $s = $s.Replace("`r`n", '\n').Replace("`n", '\n').Replace("`r", '\n')
     $s = $s.Replace("`t", '\t')
     return $s
@@ -94,7 +100,36 @@ function Get-LiveWorkshopMeta([string]$id) {
     if ($desc.Length -lt 80) {
         throw "Scraped description too short ($($desc.Length) chars) — abort to avoid wiping page."
     }
-    return @{ Title = $title; Description = $desc }
+    return @{ Title = $title; Description = $desc; Source = "live Workshop page" }
+}
+
+function Get-PreservedWorkshopMeta([string]$id) {
+    $preservePath = Join-Path $scriptDir "_preserved_description_$id.txt"
+    $existingVdfPath = Join-Path $scriptDir "workshop_item_${id}.vdf"
+    if (-not (Test-Path -LiteralPath $preservePath -PathType Leaf)) {
+        throw "Preserved Workshop description missing: $preservePath"
+    }
+    if (-not (Test-Path -LiteralPath $existingVdfPath -PathType Leaf)) {
+        throw "Existing Workshop VDF missing; cannot safely preserve the current title: $existingVdfPath"
+    }
+
+    $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
+    $desc = [IO.File]::ReadAllText($preservePath, $strictUtf8).Trim()
+    if ($desc.Length -lt 80) {
+        throw "Preserved description too short ($($desc.Length) chars) -- abort to avoid wiping the page."
+    }
+
+    $existingVdf = [IO.File]::ReadAllText($existingVdfPath, $strictUtf8)
+    $titleMatch = [regex]::Match($existingVdf, '(?m)^\s*"title"\s+"([^"\r\n]+)"\s*$')
+    if (-not $titleMatch.Success -or [string]::IsNullOrWhiteSpace($titleMatch.Groups[1].Value)) {
+        throw "Could not recover the preserved Workshop title from $existingVdfPath"
+    }
+
+    return @{
+        Title = $titleMatch.Groups[1].Value
+        Description = $desc
+        Source = "preserved local snapshot"
+    }
 }
 
 # --- prepare content ---
@@ -132,35 +167,36 @@ if (-not $preview) {
 }
 if (-not $preview) { throw "preview image missing under $backupUpload" }
 
-$meta = Get-LiveWorkshopMeta $WorkshopContentId
+$vdfPath = Join-Path $scriptDir "workshop_item_${WorkshopContentId}.vdf"
 $preservePath = Join-Path $scriptDir "_preserved_description_$WorkshopContentId.txt"
-[IO.File]::WriteAllText($preservePath, $meta.Description, [Text.UTF8Encoding]::new($false))
+$meta = $null
+if ($UsePreservedMeta) {
+    Write-Host "Using preserved Workshop metadata snapshot (live fetch bypassed)." -ForegroundColor Yellow
+    $meta = Get-PreservedWorkshopMeta $WorkshopContentId
+} else {
+    try {
+        $meta = Get-LiveWorkshopMeta $WorkshopContentId
+        [IO.File]::WriteAllText($preservePath, $meta.Description, [Text.UTF8Encoding]::new($false))
+    } catch {
+        Write-Warning "Live Workshop metadata fetch failed: $($_.Exception.Message)"
+        Write-Warning "Falling back to the last preserved title and description snapshot."
+        $meta = Get-PreservedWorkshopMeta $WorkshopContentId
+    }
+}
+Write-Host "Metadata source: $($meta.Source)" -ForegroundColor Green
 Write-Host "Preserved title: $($meta.Title)" -ForegroundColor Green
-Write-Host "Preserved description length: $($meta.Description.Length) -> $preservePath" -ForegroundColor Green
+Write-Host "Preserved description length: $($meta.Description.Length)" -ForegroundColor Green
 
 if (-not $ChangeNote) {
-    $ChangeNote = @"
-[h2]2026-07-15 Update[/h2]
-[list]
-[*][b]Abno pool isolation[/b]: exclusives gated by floor clear (ID+script); safer script match; atlas prune uses ResolveRealizationFloor
-[*][b]Emotion tiers[/b]: mid-battle picks re-check exclusive gate after progress reset
-[*][b]Chapter pools[/b]: GetTierForRewardPage for shop/post-battle/GetCurChapterCreature
-[*][b]EN localization[/b]: Atlas → Compendium (CN 图鉴 / KR 도감 unchanged)
-[/list]
-
-[h2]2026-07-15 更新[/h2]
-[list]
-[*][b]异想体隔离[/b]：专属页按解放门控（ID+脚本）；图鉴修剪用 ResolveRealizationFloor
-[*][b]情感分层[/b]：局中再校验专属门禁
-[*][b]章节池[/b]：商店/战后/章节池用 GetTierForRewardPage
-[*][b]英文[/b]：图鉴显示 Compendium（中文图鉴/韩文도감不变）
-[/list]
-
-DLL SHA: $dllHash
-"@.Trim()
+    $defaultChangeNotePath = Join-Path $scriptDir "workshop_changenote_${WorkshopContentId}.txt"
+    if (-not (Test-Path -LiteralPath $defaultChangeNotePath -PathType Leaf)) {
+        throw "Default Workshop changenote missing: $defaultChangeNotePath"
+    }
+    $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
+    $ChangeNote = [IO.File]::ReadAllText($defaultChangeNotePath, $strictUtf8).Trim()
+    $ChangeNote += "`n`nDLL SHA: $dllHash"
 }
 
-$vdfPath = Join-Path $scriptDir "workshop_item_${WorkshopContentId}.vdf"
 $descEsc = Escape-VdfString $meta.Description
 $titleEsc = Escape-VdfString $meta.Title
 $noteEsc = Escape-VdfString $ChangeNote
@@ -181,7 +217,7 @@ $vdf = @"
 }
 "@
 [IO.File]::WriteAllText($vdfPath, $vdf, [Text.UTF8Encoding]::new($false))
-Write-Host "VDF written (description preserved from live page): $vdfPath" -ForegroundColor Cyan
+Write-Host "VDF written (metadata source: $($meta.Source)): $vdfPath" -ForegroundColor Cyan
 
 # Parse the VDF the way steamcmd's KeyValues reader does BEFORE spending a login round-trip on it.
 # A scraped description that smuggles in page JavaScript produces a file that looks fine but makes
@@ -218,10 +254,15 @@ function Assert-VdfParses([string]$path) {
 }
 Assert-VdfParses $vdfPath
 
+if ($DryRun) {
+    Write-Host "Dry run complete. VDF generated and validated; SteamCMD was not started." -ForegroundColor Green
+    exit 0
+}
+
 $steamcmd = @("E:\Steam\steamcmd\steamcmd.exe", "E:\Steam\steamcmd.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $steamcmd) { throw "steamcmd not found" }
 
-Write-Host "Uploading content only — description is the LIVE scraped text, not a short log." -ForegroundColor Yellow
+Write-Host "Uploading content only -- title and description source: $($meta.Source)." -ForegroundColor Yellow
 & $steamcmd +login $SteamUser +workshop_build_item $vdfPath +quit
 $code = $LASTEXITCODE
 Write-Host "steamcmd exit: $code"

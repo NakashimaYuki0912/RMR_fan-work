@@ -158,29 +158,24 @@
       <Desc>每当该角色使用战斗书页时，其他所有友方会将手中一张随机战斗书页暂时升级至本幕结束。</Desc>
     </BattleEffectText>
 
-	<BattleEffectText ID="RMR_Zeal_Keyword">
-      <Name>Zeal</Name>
-      <Desc>At the start of the Act, add a copy of this page to all other allies' deck.</Desc>
-    </BattleEffectText>
-
 	<BattleEffectText ID="RMR_Adapt_Keyword">
-      <Name>Adapt</Name>
-      <Desc>Change the position of the die with Adapt.</Desc>
+      <Name>适应</Name>
+      <Desc>改变带有“适应”的骰子在书页中的位置。</Desc>
     </BattleEffectText>
 
 	<BattleEffectText ID="RMR_Restoration">
-      <Name>Restoration</Name>
-      <Desc>In {1} Scenes, purge this and this character recovers {0} HP. Increase stack by half of the damage received while this character has this status.</Desc>
+      <Name>复原</Name>
+      <Desc>在{1}幕后移除此状态并恢复{0}点体力；拥有此状态期间，每受到伤害便使层数增加所受伤害的一半。</Desc>
     </BattleEffectText>
 
 	<BattleEffectText ID="RMR_Restoration_Keyword">
-      <Name>Restoration X</Name>
-      <Desc>In 3 Scenes, purge this and this character recovers X HP. Increase stack by half of the damage received while this character has this status.</Desc>
+      <Name>复原 X</Name>
+      <Desc>3幕后移除此状态并恢复X点体力；拥有此状态期间，每受到伤害便使层数增加所受伤害的一半。</Desc>
     </BattleEffectText>
 
 	<BattleEffectText ID="RMR_Engarde">
-      <Name>En Garde</Name>
-      <Desc>Upon winning {0} clashes against the same target, inflict 1 Fragile and Stagger Fragile to them next Scene.</Desc>
+      <Name>迎击架势</Name>
+      <Desc>对同一目标赢得{0}次拼点后，使其下一幕获得1层易损与混乱易损。</Desc>
     </BattleEffectText>
 
 	<!-- base stagger fragile is not localized so this is here to give it localization in case other mods do not do it -->

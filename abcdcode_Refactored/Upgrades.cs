@@ -2263,6 +2263,7 @@ namespace abcdcode_LOGLIKE_MOD
             this.upgradeinfo = new UpgradeBase.UpgradeInfo();
             this.upgradeinfo.SetDice(0, 1, 2);
             this.upgradeinfo.SetDice(1, 1, 2);
+            this.upgradeinfo.SetSelfAbility("RMR_kaliNormalAttackJ");
             this.baseid = new LorId(LogLikeMod.ModId, 607003);
         }
     }
@@ -2283,6 +2284,7 @@ namespace abcdcode_LOGLIKE_MOD
             this.upgradeinfo.SetDice(0, 1, 1);
             this.upgradeinfo.SetDice(1, 1, 1);
             this.upgradeinfo.SetDice(2, 1, 1);
+            this.upgradeinfo.SetSelfAbility("RMR_kaliNormalAttackZ");
             this.baseid = new LorId(LogLikeMod.ModId, 607004);
         }
     }
@@ -2302,6 +2304,7 @@ namespace abcdcode_LOGLIKE_MOD
             this.upgradeinfo = new UpgradeBase.UpgradeInfo();
             this.upgradeinfo.SetDice(0, 1, 2);
             this.upgradeinfo.SetDice(1, 1, 2);
+            this.upgradeinfo.SetSelfAbility("RMR_kaliNormalAttackH");
             this.baseid = new LorId(LogLikeMod.ModId, 607005);
         }
     }

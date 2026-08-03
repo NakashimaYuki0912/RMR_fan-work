@@ -59,16 +59,22 @@ Assert-Match $passiveInventoryHook `
     'IsRoguelikeBattleSettingContext\(\)' `
     'Passive attribution inventory must recognize vanilla realization-stage prepare.'
 Assert-Match $passiveInventoryHook `
-    'FilterEquipInventoryBooks\s*\(\s*LogueBookModels\.booklist\s*\)' `
-    'Passive attribution must use the Compendium projection with floor chapter limits.'
+    'FilterRealizationCompendiumBooks\s*\(\s*LogueBookModels\.booklist\s*\)' `
+    'Passive attribution must use the Compendium projection and its floor chapter cap.'
 
 $allBooksHook = [regex]::Match(
     $patches,
-    'BookInventoryModel_GetBookListAll\((?<body>[\s\S]*?)\n\s*\}'
+    'BookInventoryModel_GetBookListAll\((?<body>[\s\S]*?)\[HarmonyPostfix,\s*HarmonyPatch\(typeof\(BookInventoryModel\),\s*nameof\(BookInventoryModel\.GetBookList_PassiveEquip\)\)\]'
 ).Groups['body'].Value
 Assert-Match $allBooksHook `
     'IsRoguelikeBattleSettingContext\(\)' `
     'Passive Apply must enumerate the realization Compendium books, not vanilla inventory.'
+Assert-Match $allBooksHook `
+    'LogueBookModels\.playerModel' `
+    'Passive Apply must retain the canonical equipped RMR books so reserved passive ownership can resolve by instance ID.'
+Assert-Match $allBooksHook `
+    'FilterRealizationCompendiumBooks\s*\(\s*LogueBookModels\.booklist\s*\)' `
+    'Passive Apply must append the RMR Compendium projection after the canonical equipped books.'
 
 foreach ($lookupHookName in @(
     'BookInventoryModel_GetAllBookByInstanceId',
@@ -89,15 +95,24 @@ Assert-Match $patches `
     'ResolveRoguelikeUnitData[\s\S]*?bookItem\.instanceId' `
     'Equivalent realization UI units must resolve to the canonical RMR librarian by book instance ID.'
 Assert-Match $patches `
-    'UIBattleSettingLibrarianInfoPanel_SetData[\s\S]*?ResolveRoguelikeUnitData\s*\(\s*data\s*\)[\s\S]*?UIPassiveSuccessionPopup\.Instance\.SetData\(\s*targetUnit' `
+    'ResolveRoguelikeUnitData[\s\S]*?currentSelectedSlot[\s\S]*?playerBattleModel[\s\S]*?IsRealizationPreparationActive[\s\S]*?return null' `
+    'Realization UI units must fall back to the selected projected slot and must never return a vanilla transient candidate.'
+Assert-Match $patches `
+    'UIBattleSettingLibrarianInfoPanel_SetData[\s\S]*?ResolveRoguelikeUnitData\s*\(\s*data\s*,\s*__instance\.GetCharacterListPanel\(\)\s*\)[\s\S]*?UIPassiveSuccessionPopup\.Instance\.SetData\(\s*targetUnit' `
     'Passive succession must edit the canonical RMR librarian, not a transient equivalent UI unit.'
 Assert-Match $patches `
     'UnitDataModel_EquipBookForUI[\s\S]*?ResolveRoguelikeUnitData\s*\(\s*__instance\s*\)[\s\S]*?EquipNewPage\(\s*targetBattleModel' `
     'Core-page changes must target the canonical realization battle model.'
+Assert-Match $patches `
+    'StageController_CreateLibrarianUnit[\s\S]*?InRealizationBattle[\s\S]*?CreateRoguelikeLibrarianUnits[\s\S]*?playerBattleModel\.FindAll\(x\s*=>\s*x\.IsAddedBattle\)' `
+    'Realization combat must create librarians exclusively from the configured projected battle models.'
 
 Assert-Match $restrictions `
     'IsUrbanStarSpecialCorePage\s*\(\s*book\s*\)[\s\S]*?return ChapterUrbanStar' `
     'Black Silence, Binah, Red Mist, and Argalia must be treated as Urban Star realization books.'
+Assert-Match $restrictions `
+    'GetRealizationMaxChapter[\s\S]*?case SephirahType\.Malkuth[\s\S]*?case SephirahType\.Yesod[\s\S]*?case SephirahType\.Hod[\s\S]*?case SephirahType\.Netzach[\s\S]*?return ChapterUrbanStar[\s\S]*?default:[\s\S]*?return ChapterImpurity' `
+    'The first four realizations must cap at Urban Star while later floors allow Impurity.'
 Assert-Match $models `
     'public static bool IsUrbanStarSpecialCorePage[\s\S]*?IsBlackSilenceCorePage[\s\S]*?IsBinahCorePage[\s\S]*?IsRedMistCorePage[\s\S]*?IsBlueReverberationCorePage' `
     'All four special Urban Star core pages must share one realization chapter classifier.'

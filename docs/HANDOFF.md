@@ -1,4 +1,4 @@
-# LoR-RMR 会话交接（2026-07-27）
+# LoR-RMR 会话交接（2026-08-03）
 
 > 新会话请先读 [AGENTS.md](../AGENTS.md) 与 [agent-handbook/00-INDEX.md](./agent-handbook/00-INDEX.md)。  
 > 本文是**快照**，以 `git status` 与 `RMR_Core.BuildTimestamp` 为准。
@@ -23,7 +23,7 @@ Player.log:
 
 - 外层 `D:\VS_program\ruina-roguelike-reborn-main\` **没有** `.git`。  
 - 原作者对照：`D:\VS_program\ruina-roguelike-reborn-main\original-codes\`（只读）。
-- GitHub 远端已迁移到 `https://github.com/NakashimaYuki0912/RMR_fan-work.git`。
+- 当前 GitHub `origin`：`https://github.com/NakashimaYuki0912/RMR_private.ver`（以 `git remote -v` 为准）。
 
 **本机日常测试用 `deploy_local.ps1`，不是 `deploy_workshop.ps1`。** 两者 ModId 相同，
 Mod 列表里只能启用一个，否则互相顶掉（玩家反馈「杂质章节不存在」多半就是这个原因）。
@@ -34,11 +34,21 @@ Mod 列表里只能启用一个，否则互相顶掉（玩家反馈「杂质章�
 
 | 项 | 值 |
 |---|---|
-| Build 戳 | `2026-07-27Tcontinue-deck-restore-fix+08:00` |
-| DLL SHA256 | `9C6CEADDB0538CCDD37740654EAB47CD08E7FF3810647ADAAC41CB5023664BD7` |
+| Build 戳 | `2026-08-03Tgithub-release-cleanup+08:00` |
+| 本地测试 DLL SHA256 | `443C99F93320B8C49F19120C035B6D1E6468563FF2C9FCFA835792616D5970A8` |
 | Workshop | **已发布**（item 3743867841，2026-07-27，91.40 MB） |
-| GitHub | 已推送，内容与 Workshop 一致 |
-| 工作树 | 干净（打包脚本修复待提交） |
+| Workshop DLL SHA256 | `0D5BB90368339D83A4E056313605AA7882FAF9A102F44C233AA7FC57073B99FC`（本轮未上传） |
+| GitHub | 当前发布目标为 `origin/main`；具体提交以 `git log -1` 为准 |
+| 工作树 | 以 `git status --short` 为准 |
+
+### 2026-08-03 发布审查摘要
+
+- 解放战仍使用直接配置的临时图鉴编队；整队/单司书预设实验均已移除。
+- 修复临时司书与准备界面的对象映射，避免核心页、副本壳和被动归属串位。
+- 路线快照现在同时保存并恢复归属被动、被动供体占用和特殊固定牌组来源，避免解放战污染路线配置。
+- 前四层配置上限为都市之星，后六层为杂质；候选只来自永久图鉴。
+- 临时被动诊断探针与解析脚本已从 Release 源码中移除。
+- Release、三语本地化、XML、Harmony 签名及相关专项静态检查已通过；新 Build 尚待重启游戏后用 `Player.log` 确认。
 
 ---
 

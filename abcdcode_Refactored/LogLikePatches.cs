@@ -53,6 +53,24 @@ namespace abcdcode_LOGLIKE_MOD
             if (self == null)
                 return;
 
+            self.cardSelectionGroup.interactable = false;
+            self.cardSelectionGroup.blocksRaycasts = false;
+            if (self.egoSlotList != null)
+            {
+                foreach (BattleDiceCardUI slot in self.egoSlotList)
+                {
+                    if (slot != null)
+                        slot.gameObject.SetActive(false);
+                }
+            }
+            if (self.candidates != null)
+            {
+                foreach (EmotionPassiveCardUI slot in self.candidates)
+                {
+                    if (slot != null)
+                        slot.gameObject.SetActive(false);
+                }
+            }
             self.SetRootCanvas(false);
             if (LogLikeMod.skipPanel != null)
                 LogLikeMod.skipPanel.gameObject.SetActive(false);
@@ -529,7 +547,7 @@ namespace abcdcode_LOGLIKE_MOD
                     try { RewardingModel.NoteMidBattleEgoPicked(LorId.None); } catch { }
                     try { RewardingModel.rewardFlag = RewardingModel.RewardFlag.EmtoionChoose; } catch { }
                     if (self != null)
-                        self.SetRootCanvas(false);
+                        LogLikeRoutines.HideRewardSelectionImmediately(self);
                     try { RMRPrepareRestrictions.ForceHandUiToBattleCards(); } catch { }
                     Debug.Log("[RMR] Mid-battle EGO skipped — resume combat (no StartPickReward).");
                     return;
@@ -2512,7 +2530,7 @@ namespace abcdcode_LOGLIKE_MOD
         {
             if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return orig(self);
-            List<BookModel> books = RMRPrepareRestrictions.FilterEquipInventoryBooks(LogueBookModels.booklist);
+            List<BookModel> books = RMRPrepareRestrictions.FilterRealizationCompendiumBooks(LogueBookModels.booklist);
             RMRPrepareRestrictions.NotifyInventoryEmptyIfNeeded(isBookInventory: true, books?.Count ?? 0);
             return books;
         }
@@ -2619,26 +2637,35 @@ namespace abcdcode_LOGLIKE_MOD
                 GameObject gameObject = (GameObject)typeof(UIInvenCardSlot).GetField("deckLimitRoot", AccessTools.all).GetValue(self);
                 DiceCardItemModel _cardModel = (DiceCardItemModel)typeof(UIOriginCardSlot).GetField("_cardModel", AccessTools.all).GetValue(self);
                 FieldInfo field = typeof(UIInvenCardSlot).GetField("slotState", AccessTools.all);
+                UnitDataModel currentUnit = UI.UIController.Instance?.CurrentUnit;
+                if (textMeshProUgui == null
+                    || gameObject == null
+                    || _cardModel?.ClassInfo == null
+                    || field == null
+                    || currentUnit?.bookItem?.ClassInfo == null)
+                {
+                    orig(self);
+                    return;
+                }
                 field.SetValue(self, UIINVENCARD_STATE.None);
                 if (_cardModel.num <= 0)
                     field.SetValue(self, UIINVENCARD_STATE.NumberZero);
-                if (UI.UIController.Instance.CurrentUnit.GetDeckAll().FindAll(x => x.id.GetOriginalId() == _cardModel.GetID().GetOriginalId()).Count >= _cardModel.GetLimit())
+                List<DiceCardXmlInfo> deckAll = currentUnit.GetDeckAll();
+                if (deckAll != null
+                    && deckAll.FindAll(x => x.id.GetOriginalId() == _cardModel.GetID().GetOriginalId()).Count >= _cardModel.GetLimit())
                     field.SetValue(self, UIINVENCARD_STATE.LimitedDeck);
-                UnitDataModel currentUnit = UI.UIController.Instance.CurrentUnit;
-                if (currentUnit != null)
+                BookModel bookItem = currentUnit.bookItem;
+                List<DiceCardXmlInfo> onlyCards = bookItem.GetOnlyCards() ?? new List<DiceCardXmlInfo>();
+                if (_cardModel.ClassInfo.optionList != null
+                    && _cardModel.ClassInfo.optionList.Contains(CardOption.OnlyPage))
                 {
-                    BookModel bookItem = currentUnit.bookItem;
-                    List<DiceCardXmlInfo> onlyCards = bookItem.GetOnlyCards();
-                    if (_cardModel.ClassInfo.optionList.Contains(CardOption.OnlyPage))
-                    {
-                        if (!onlyCards.Exists(y => y.id.GetOriginalId() == _cardModel.GetID().GetOriginalId()))
-                            field.SetValue(self, UIINVENCARD_STATE.OnlyPage);
-                    }
-                    else if (bookItem.ClassInfo.RangeType == EquipRangeType.Melee && _cardModel.GetSpec().Ranged == CardRange.Far)
-                        field.SetValue(self, UIINVENCARD_STATE.RangeCard);
-                    else if (bookItem.ClassInfo.RangeType == EquipRangeType.Range && _cardModel.GetSpec().Ranged == CardRange.Near)
-                        field.SetValue(self, UIINVENCARD_STATE.MeleeCard);
+                    if (!onlyCards.Exists(y => y.id.GetOriginalId() == _cardModel.GetID().GetOriginalId()))
+                        field.SetValue(self, UIINVENCARD_STATE.OnlyPage);
                 }
+                else if (bookItem.ClassInfo.RangeType == EquipRangeType.Melee && _cardModel.GetSpec().Ranged == CardRange.Far)
+                    field.SetValue(self, UIINVENCARD_STATE.RangeCard);
+                else if (bookItem.ClassInfo.RangeType == EquipRangeType.Range && _cardModel.GetSpec().Ranged == CardRange.Near)
+                    field.SetValue(self, UIINVENCARD_STATE.MeleeCard);
                 gameObject.gameObject.SetActive((UIINVENCARD_STATE)field.GetValue(self) > UIINVENCARD_STATE.None);
                 self.SetGrayScale((UIINVENCARD_STATE)field.GetValue(self) > UIINVENCARD_STATE.None);
                 switch ((UIINVENCARD_STATE)field.GetValue(self))
@@ -4569,18 +4596,29 @@ namespace abcdcode_LOGLIKE_MOD
         {
             if (!LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return;
-            List<BookModel> bookModelList = new List<BookModel>();
+            // Passive/core-page editors call GetBookListAll instead of GetBookList_equip.
+            // Keep the RMR inventory as the only source collection, but also include the
+            // five actually equipped RMR librarian books. Passive succession stores their
+            // instance ids in source pages and vanilla resolves those ids through this API;
+            // omitting them leaves a dangling "already equipped" relation and crashes hover.
+            List<BookModel> result = new List<BookModel>();
             if (LogueBookModels.playerModel != null)
             {
-                foreach (UnitDataModel unitDataModel in LogueBookModels.playerModel)
+                foreach (UnitDataModel unit in LogueBookModels.playerModel)
                 {
-                    if (unitDataModel?.defaultBook != null)
-                        bookModelList.Add(unitDataModel.defaultBook);
+                    BookModel equipped = unit?.bookItem;
+                    if (equipped != null && !result.Any(book => book.instanceId == equipped.instanceId))
+                        result.Add(equipped);
                 }
             }
-            if (LogueBookModels.booklist != null)
-                bookModelList.AddRange(LogueBookModels.booklist.Where(book => book != null));
-            __result = bookModelList;
+            foreach (BookModel inventoryBook in
+                RMRPrepareRestrictions.FilterRealizationCompendiumBooks(LogueBookModels.booklist))
+            {
+                if (inventoryBook != null
+                    && !result.Any(book => book.instanceId == inventoryBook.instanceId))
+                    result.Add(inventoryBook);
+            }
+            __result = result;
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(BookInventoryModel), nameof(BookInventoryModel.GetBookList_PassiveEquip))]
@@ -4595,7 +4633,7 @@ namespace abcdcode_LOGLIKE_MOD
                 return;
             List<BookModel> bookModelList1 = new List<BookModel>();
             List<BookModel> bookModelList2 =
-                RMRPrepareRestrictions.FilterEquipInventoryBooks(LogueBookModels.booklist);
+                RMRPrepareRestrictions.FilterRealizationCompendiumBooks(LogueBookModels.booklist);
             foreach (BookModel bookModel in bookModelList2)
             {
                 if (bookModel.owner == null && bookModel.GetPassiveInfoList().Count != 0)
@@ -5428,6 +5466,18 @@ namespace abcdcode_LOGLIKE_MOD
         }
 
 
+        [HarmonyPrefix, HarmonyPatch(typeof(UIBattleSettingLibrarianInfoPanel), nameof(UIBattleSettingLibrarianInfoPanel.SetData))]
+        public static void UIBattleSettingLibrarianInfoPanel_SetData_Resolve(
+          UIBattleSettingLibrarianInfoPanel __instance,
+          ref UnitDataModel data)
+        {
+            if (__instance == null || data == null || !LogLikeRoutines.IsRoguelikeBattleSettingContext())
+                return;
+            UnitDataModel resolved = ResolveRoguelikeUnitData(data, __instance.GetCharacterListPanel());
+            if (resolved != null)
+                data = resolved;
+        }
+
         /// <summary>
         /// Wire passive succession for RMR librarians, and force-unlock key/combat page slots.
         /// SetData only runs SetBattleCardSlotState/SetEquipPageSlotState when isSephirahPanel;
@@ -5440,9 +5490,13 @@ namespace abcdcode_LOGLIKE_MOD
         {
             if (__instance == null || data == null || !LogLikeRoutines.IsRoguelikeBattleSettingContext())
                 return;
-            UnitDataModel targetUnit = ResolveRoguelikeUnitData(data);
+            UnitDataModel targetUnit = ResolveRoguelikeUnitData(data, __instance.GetCharacterListPanel());
             if (targetUnit == null)
+            {
+                __instance.PassiveListSelectable.SubmitEvent.RemoveAllListeners();
+                Debug.LogWarning("[RMRRealizationManager] Passive edit blocked because the selected projected librarian could not be resolved.");
                 return;
+            }
             // Vanilla may hand this panel an equivalent realization UnitDataModel rather
             // than the exact object stored in playerModel. Context is the authoritative
             // guard; requiring reference identity made passive succession unclickable.
@@ -5454,19 +5508,24 @@ namespace abcdcode_LOGLIKE_MOD
             try { LogLikeMod.RepairTmpFontsUnder(__instance.gameObject, "LibrarianInfoPanel.SetData"); }
             catch { /* never block the prep screen */ }
             LogLikeRoutines.ForceUnlockBattleSettingLoadoutSlots(__instance);
-            __instance.PassiveListSelectable.SubmitEvent.AddListener((UnityAction<BaseEventData>)(e => UIPassiveSuccessionPopup.Instance.SetData(targetUnit, (UIPassiveSuccessionPopup.ApplyEvent)(() =>
+            __instance.PassiveListSelectable.SubmitEvent.AddListener((UnityAction<BaseEventData>)(e =>
             {
-                __instance.passiveSlotsPanel.SetStatsDataInEquipBook(targetUnit.bookItem);
-                (UI.UIController.Instance.GetUIPanel(UIPanelType.BattleSetting) as UIBattleSettingPanel).EditPanel.EquipPagePanel.ChangeEquipBook(null);
-                UIControlManager.Instance.SelectSelectableForcely(__instance.PassiveListSelectable);
-                // Realization loadouts are temporary projections and must not overwrite
-                // the route snapshot while the player assigns Compendium passives.
-                if (!RMRRealizationManager.IsRealizationPreparationActive)
-                    LoguePlayDataSaver.SavePlayData_Menu();
-            }))));
+                UIPassiveSuccessionPopup.Instance.SetData(targetUnit, (UIPassiveSuccessionPopup.ApplyEvent)(() =>
+                {
+                    __instance.passiveSlotsPanel.SetStatsDataInEquipBook(targetUnit.bookItem);
+                    (UI.UIController.Instance.GetUIPanel(UIPanelType.BattleSetting) as UIBattleSettingPanel).EditPanel.EquipPagePanel.ChangeEquipBook(null);
+                    UIControlManager.Instance.SelectSelectableForcely(__instance.PassiveListSelectable);
+                    // Realization loadouts are temporary projections and must not overwrite
+                    // the route snapshot while the player assigns Compendium passives.
+                    if (!RMRRealizationManager.IsRealizationPreparationActive)
+                        LoguePlayDataSaver.SavePlayData_Menu();
+                }));
+            }));
         }
 
-        private static UnitDataModel ResolveRoguelikeUnitData(UnitDataModel candidate)
+        private static UnitDataModel ResolveRoguelikeUnitData(
+            UnitDataModel candidate,
+            UILibrarianCharacterListPanel characterListPanel = null)
         {
             if (candidate == null || LogueBookModels.playerModel == null)
                 return candidate;
@@ -5479,7 +5538,51 @@ namespace abcdcode_LOGLIKE_MOD
             List<UnitDataModel> matches = LogueBookModels.playerModel
                 .FindAll(unit => unit?.bookItem != null
                     && unit.bookItem.instanceId == candidate.bookItem.instanceId);
-            return matches.Count == 1 ? matches[0] : candidate;
+            if (matches.Count == 1)
+                return matches[0];
+
+            // Vanilla realization prepare can clone/equivalent-wrap a UnitDataModel. Its
+            // key-page instance may no longer match, but the character-list slot order is
+            // the RMR playerBattleModel order installed by our list-panel hook.
+            try
+            {
+                if (characterListPanel == null)
+                {
+                    UIBattleSettingPanel battleSetting =
+                        UI.UIController.Instance.GetUIPanel(UIPanelType.BattleSetting) as UIBattleSettingPanel;
+                    characterListPanel = battleSetting?.GetCharacterListPanel();
+                }
+                UICharacterList characterList = characterListPanel == null
+                    ? null
+                    : LogLikeMod.GetFieldValue<UICharacterList>(characterListPanel, "CharacterList");
+                if (characterList?.slotList != null && LogueBookModels.playerBattleModel != null)
+                {
+                    int slotIndex = characterList.slotList.FindIndex(slot =>
+                        ReferenceEquals(slot?.unitBattleData?.unitData, candidate));
+                    if (slotIndex < 0)
+                    {
+                        UICharacterSlot currentSelectedSlot =
+                            LogLikeMod.GetFieldValue<UICharacterSlot>(characterList, "currentSelectedSlot");
+                        slotIndex = characterList.slotList.IndexOf(currentSelectedSlot);
+                    }
+                    if (slotIndex >= 0 && slotIndex < LogueBookModels.playerBattleModel.Count)
+                    {
+                        UnitDataModel projected = LogueBookModels.playerBattleModel[slotIndex]?.unitData;
+                        if (projected != null)
+                            return projected;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMRRealizationManager] Selected librarian slot resolution failed: " + ex.Message);
+            }
+
+            // Never let realization prepare silently edit a vanilla transient librarian;
+            // that makes the UI appear configured while combat still uses playerBattleModel.
+            if (RMRRealizationManager.IsRealizationPreparationActive)
+                return null;
+            return candidate;
         }
 
         /// <summary>

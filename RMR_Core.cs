@@ -77,7 +77,7 @@ namespace RogueLike_Mod_Reborn
         public const string packageId = "abcdcodecalmmagma.LogueLikeReborn";
         public static CustomMapHandler RMRMapHandler;
 
-        public const string BuildTimestamp = "2026-07-30Thelp-handbook-categories+08:00";
+        public const string BuildTimestamp = "2026-08-03Tgithub-release-cleanup+08:00";
 
         #endregion
 
@@ -807,6 +807,13 @@ namespace RogueLike_Mod_Reborn
             705011    // Argalia Danza, wide (no player-facing localization in vanilla)
         };
 
+        public static bool IsBlueReverberationBattlePage(LorId id)
+        {
+            return id != null
+                && (string.IsNullOrEmpty(id.packageId) || id.packageId == "@origin")
+                && Array.IndexOf(BlueReverberationBattlePageIds, id.id) >= 0;
+        }
+
         public static LorId GetBlueReverberationCorePageLorId()
         {
             if (_resolvedBlueReverberationCorePageId != null)
@@ -1136,10 +1143,21 @@ namespace RogueLike_Mod_Reborn
                             && skin.IndexOf("Argalia", StringComparison.OrdinalIgnoreCase) >= 0)));
         }
 
+        public static bool IsInternalLibrarianShell(LorId id)
+        {
+            if (id == null || id.id < -858 || id.id > -854)
+                return false;
+            return string.IsNullOrEmpty(id.packageId)
+                || id.packageId == LogLikeMod.ModId
+                || id.packageId == RMRCore.packageId;
+        }
+
         public static bool ShouldRecordRoleBookInPermanentCompendium(BookXmlInfo page)
         {
-            return !IsBinahCorePage(page)
-                || RMRAbnormalityUnlockManager.IsRedMistChallengeVictoryRecorded();
+            return page != null
+                && !IsInternalLibrarianShell(page.id)
+                && (!IsBinahCorePage(page)
+                    || RMRAbnormalityUnlockManager.IsRedMistChallengeVictoryRecorded());
         }
 
         public static void PrepareBinahForRedMistChallenge()

@@ -69,6 +69,8 @@
     <Card>608014</Card>
     <Card>608015</Card>
     <Card>608016</Card>
+    <!-- Nikolai's obtainable OnlyPage finisher; still equip-restricted by core page. -->
+    <Card>608004</Card>
 
     <!-- Purple Tear: public combat pages only (exclude MultiDeck stance and OnlyPage cards). -->
     <Card>609001</Card>

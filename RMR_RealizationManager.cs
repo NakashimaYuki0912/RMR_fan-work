@@ -54,6 +54,19 @@ namespace RogueLike_Mod_Reborn
             { SephirahType.Keter,     "\u603b\u7c7b\u5c42" },
         };
 
+        public static string GetLocalizedRealizationFloorName(SephirahType floor)
+        {
+            try
+            {
+                string key = "ui_RMR_Floor_" + floor;
+                string localized = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText(key);
+                if (!string.IsNullOrEmpty(localized) && localized != key)
+                    return localized;
+            }
+            catch { }
+            return FloorDisplayNames.TryGetValue(floor, out string fallback) ? fallback : floor.ToString();
+        }
+
         public static bool InRealizationBattle { get; private set; }
 
         /// <summary>
@@ -151,10 +164,34 @@ namespace RogueLike_Mod_Reborn
         {
             if (PendingRealizationBattle)
             {
+                LogProjectedRealizationTeam("battle activation");
                 InRealizationBattle = true;
                 PendingRealizationBattle = false;
                 RealizationCombatLive = false;
                 Debug.Log($"[RMRRealizationManager] Activated realization battle: {CurrentRealizationFloor}");
+            }
+        }
+
+        private static void LogProjectedRealizationTeam(string reason)
+        {
+            try
+            {
+                List<UnitBattleDataModel> selected = LogueBookModels.playerBattleModel?
+                    .Where(model => model?.unitData != null && model.IsAddedBattle)
+                    .ToList() ?? new List<UnitBattleDataModel>();
+                string[] summaries = selected.Select((model, index) =>
+                {
+                    UnitDataModel unit = model.unitData;
+                    LorId bookId = unit.bookItem?.ClassInfo?.id ?? LorId.None;
+                    int deckCount = unit.bookItem?.GetCardListFromCurrentDeck()?.Count ?? 0;
+                    int passiveCount = unit.bookItem?.GetPassiveInfoList()?.Count ?? 0;
+                    return $"{index}:{bookId.packageId}:{bookId.id}/deck={deckCount}/passive={passiveCount}";
+                }).ToArray();
+                Debug.Log($"[RMRRealizationManager] Projected team ({reason}) selected={selected.Count} [{string.Join(", ", summaries)}]");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMRRealizationManager] Projected team log failed: " + ex.Message);
             }
         }
         #endregion
@@ -660,6 +697,8 @@ namespace RogueLike_Mod_Reborn
         private static Dictionary<UnitDataModel, List<LorId>> RoutePlayersPickSnapshot;
         private static Dictionary<UnitDataModel, List<LorId>> RoutePlayersPerPassivesSnapshot;
         private static Dictionary<UnitDataModel, List<LogStatAdder>> RoutePlayersStatAddersSnapshot;
+        private static Dictionary<BookModel, UnitDataModel> RouteBookOwnerSnapshot;
+        private static Dictionary<UnitDataModel, LorId> RouteGrade6SpecialDeckSourceSnapshot;
         private static abcdcode_LOGLIKE_MOD.StageType RouteStageTypeSnapshot;
         private static LorId RouteStageIdSnapshot;
         private static List<EmotionCardXmlInfo> RouteNextListSnapshot;
@@ -675,8 +714,12 @@ namespace RogueLike_Mod_Reborn
         {
             public LorId EquippedBookId;
             public List<LorId> DeckCardIds;
+            public int BookInstanceId;
+            public List<int> EquippedPassiveBookInstanceIds;
+            public List<SaveData> InheritedPassives;
             public string CustomName;
         }
+
         private static List<UnitDeepState> RouteUnitDeepStates;
         /// <summary>
         /// Resolve the vanilla Floor Realization stage for a floor (Angela/Roland multi-phase).
@@ -1588,13 +1631,6 @@ namespace RogueLike_Mod_Reborn
             LogueBookModels.EnsureCompendiumUnlocks();
             bool changed = false;
 
-            for (int id = -854; id >= -858; id--)
-            {
-                LorId bookId = new LorId(LogLikeMod.ModId, id);
-                if (Singleton<BookXmlList>.Instance.GetData(bookId) != null)
-                    changed |= LogueBookModels.CompendiumUnlockedRoleBooks.Add(bookId);
-            }
-
             for (int id = -10; id >= -14; id--)
             {
                 LorId cardId = new LorId(LogLikeMod.ModId, id);
@@ -1608,12 +1644,52 @@ namespace RogueLike_Mod_Reborn
                 LogueBookModels.SavePermanentCompendiumData();
         }
 
+        private static bool HasBuiltInRealizationDeck(UnitDataModel unit)
+        {
+            try
+            {
+                bool editableBlue = LogueBookModels.IsEditableBlueReverberationDeck(unit?.bookItem);
+                return !editableBlue
+                    && (unit?.bookItem?.IsFixedDeck() == true
+                        || unit?.bookItem?.IsLockByBluePrimary() == true);
+            }
+            catch { return false; }
+        }
+
+        private static void FillRealizationDeckFromCompendium(UnitDataModel unit, List<DiceCardItemModel> atlasCards)
+        {
+            if (unit?.bookItem == null || atlasCards == null || HasBuiltInRealizationDeck(unit))
+                return;
+            List<DiceCardXmlInfo> deck = unit.bookItem.GetCardListFromCurrentDeck();
+            if (deck == null)
+                return;
+
+            int attempts = 0;
+            int cardIndex = 0;
+            while (deck.Count < 9 && attempts < atlasCards.Count * 2 && atlasCards.Count > 0)
+            {
+                DiceCardXmlInfo card = atlasCards[cardIndex].ClassInfo;
+                if (card != null
+                    && RMRPrepareRestrictions.IsCardAllowedInCurrentPrepare(card)
+                    && LogueBookModels.CanAddCardToCurrentDeck(card.id, unit.bookItem))
+                {
+                    try { unit.AddCardFromInventory(card.id); } catch { }
+                }
+                cardIndex = (cardIndex + 1) % atlasCards.Count;
+                attempts++;
+            }
+        }
+
 
         private static bool ApplyCompendiumOnlyLoadout()
         {
             if (CompendiumOnlyLoadoutActive)
                 return true;
             LogueBookModels.EnsureCompendiumUnlocks();
+            // Realization can be entered directly from the Hub without starting an Urban
+            // Star route. Reconcile progression-backed special rewards before taking the
+            // Compendium snapshot so old saves receive Binah and Argalia's battle pages.
+            RMRCore.GrantGrade6SpecialCorePagesIfNeeded();
             if (LogueBookModels.CompendiumUnlockedRoleBooks == null)
                 LogueBookModels.CompendiumUnlockedRoleBooks = new HashSet<LorId>();
             if (LogueBookModels.CompendiumUnlockedBattleCards == null)
@@ -1629,6 +1705,12 @@ namespace RogueLike_Mod_Reborn
             RoutePlayersPickSnapshot = LogueBookModels.playersPick == null ? new Dictionary<UnitDataModel, List<LorId>>() : new Dictionary<UnitDataModel, List<LorId>>(LogueBookModels.playersPick);
             RoutePlayersPerPassivesSnapshot = LogueBookModels.playersperpassives == null ? new Dictionary<UnitDataModel, List<LorId>>() : new Dictionary<UnitDataModel, List<LorId>>(LogueBookModels.playersperpassives);
             RoutePlayersStatAddersSnapshot = LogueBookModels.playersstatadders == null ? new Dictionary<UnitDataModel, List<LogStatAdder>>() : new Dictionary<UnitDataModel, List<LogStatAdder>>(LogueBookModels.playersstatadders);
+            RouteBookOwnerSnapshot = new Dictionary<BookModel, UnitDataModel>();
+            foreach (BookModel routeBook in RouteBookSnapshot.Where(book => book != null))
+                RouteBookOwnerSnapshot[routeBook] = routeBook.owner;
+            RouteGrade6SpecialDeckSourceSnapshot = LogueBookModels.Grade6SpecialBuiltInDeckSource == null
+                ? new Dictionary<UnitDataModel, LorId>()
+                : new Dictionary<UnitDataModel, LorId>(LogueBookModels.Grade6SpecialBuiltInDeckSource);
             RouteStageTypeSnapshot = LogLikeMod.curstagetype;
             RouteStageIdSnapshot = LogLikeMod.curstageid;
             RouteNextListSnapshot = LogLikeMod.nextlist == null ? new List<EmotionCardXmlInfo>() : new List<EmotionCardXmlInfo>(LogLikeMod.nextlist);
@@ -1653,6 +1735,17 @@ namespace RogueLike_Mod_Reborn
                         // Save current deck card IDs
                         var deck = unit.bookItem.GetCardListFromCurrentDeck();
                         ds.DeckCardIds = deck != null ? new List<LorId>(deck.Select(c => c.id)) : new List<LorId>();
+                        ds.BookInstanceId = unit.bookItem.instanceId;
+                        ds.EquippedPassiveBookInstanceIds = unit.bookItem.originData?.equipedBookIdListInPassive == null
+                            ? new List<int>()
+                            : new List<int>(unit.bookItem.originData.equipedBookIdListInPassive);
+                        ds.InheritedPassives = new List<SaveData>();
+                        foreach (PassiveModel passive in unit.bookItem.GetPassiveModelList())
+                        {
+                            if (passive?.originData != null
+                                && passive.originData.receivepassivebookId != unit.bookItem.instanceId)
+                                ds.InheritedPassives.Add(passive.GetSaveDataPassiveModel());
+                        }
                         ds.CustomName = unit.name;
                     }
                     RouteUnitDeepStates.Add(ds);
@@ -1664,7 +1757,7 @@ namespace RogueLike_Mod_Reborn
             foreach (LorId id in LogueBookModels.CompendiumUnlockedRoleBooks)
             {
                 BookXmlInfo book = Singleton<BookXmlList>.Instance.GetData(id);
-                if (book == null)
+                if (book == null || RMRCore.IsInternalLibrarianShell(book.id))
                     continue;
                 BookModel model = new BookModel(book);
                 model.instanceId = LogueBookModels.nextinstanceid++;
@@ -1673,8 +1766,24 @@ namespace RogueLike_Mod_Reborn
             }
             if (atlasBooks.Count == 0)
             {
-                Debug.LogError("[RMRRealizationManager] Atlas-only realization loadout has no unlocked core pages, including starter fallback.");
-                return false;
+                // A brand-new permanent Compendium can be empty. Keep the five private
+                // librarian shells local to this projection instead of persisting them as
+                // collectible pages (which previously made -854 clones multiply in the UI).
+                for (int id = -854; id >= -858; id--)
+                {
+                    BookXmlInfo shell = Singleton<BookXmlList>.Instance.GetData(new LorId(LogLikeMod.ModId, id));
+                    if (shell == null || !RMRCore.IsInternalLibrarianShell(shell.id))
+                        continue;
+                    BookModel model = new BookModel(shell);
+                    model.instanceId = LogueBookModels.nextinstanceid++;
+                    model.TryGainUniquePassive();
+                    atlasBooks.Add(model);
+                }
+                if (atlasBooks.Count == 0)
+                {
+                    Debug.LogError("[RMRRealizationManager] Atlas-only realization loadout has no unlocked core pages or local starter shells.");
+                    return false;
+                }
             }
 
             List<DiceCardItemModel> atlasCards = new List<DiceCardItemModel>();
@@ -1742,52 +1851,22 @@ namespace RogueLike_Mod_Reborn
             for (int i = 0; i < teamList.Count; i++)
             {
                 var unit = teamList[i];
-                // Use atlas book at matching index, or wrap around if fewer books than librarians
-                var book = atlasBooks[i % atlasBooks.Count];
+                // Use an unassigned page so the inventory owner remains a reliable, stable
+                // record of which collectible core page this private librarian shell represents.
+                var book = atlasBooks.Find(candidate => candidate != null && candidate.owner == null)
+                    ?? atlasBooks[i % atlasBooks.Count];
                 if (unit != null && book != null)
                 {
                     LogueBookModels.EquipNewPage(unit, book.ClassInfo, false);
-                    // Skip auto-fill only for true built-in decks (e.g. Black Silence, Binah).
-                    // OnlyCard pages still need atlas cards filled, otherwise realization
-                    // battles can start with empty hands after temporary atlas projection.
-                    bool hasBuiltInDeck = false;
-                    try
-                    {
-                        bool editableBlue = LogueBookModels.IsEditableBlueReverberationDeck(unit.bookItem);
-                        hasBuiltInDeck = !editableBlue
-                            && (unit.bookItem?.IsFixedDeck() == true
-                                || unit.bookItem?.IsLockByBluePrimary() == true);
-                    }
-                    catch { }
-                    if (!hasBuiltInDeck)
-                    {
-                        var deck = unit.bookItem?.GetCardListFromCurrentDeck();
-                        if (deck != null)
-                        {
-                            int deckCount = deck.Count;
-                            int needed = 9 - deckCount;
-                            int tried = 0;
-                            int cardIdx = 0;
-                            while (needed > 0 && tried < atlasCards.Count * 2 && cardIdx < atlasCards.Count)
-                            {
-                                var cardXml = atlasCards[cardIdx].ClassInfo;
-                                if (cardXml != null && LogueBookModels.CanAddCardToCurrentDeck(cardXml.id, unit.bookItem))
-                                {
-                                    unit.AddCardFromInventory(cardXml.id);
-                                    needed--;
-                                }
-                                cardIdx++;
-                                if (cardIdx >= atlasCards.Count) cardIdx = 0;
-                                tried++;
-                            }
-                        }
-                    }
-                    else
-                    {
+                    LogueBookModels.RemoveEquip(unit);
+                    book.SetOwner(unit);
+                    FillRealizationDeckFromCompendium(unit, atlasCards);
+                    if (HasBuiltInRealizationDeck(unit))
                         Debug.Log($"[RMRRealizationManager] Skipped atlas auto-fill for built-in-deck book: {book.ClassInfo.id.id}");
-                    }
                 }
             }
+
+            CompendiumOnlyLoadoutActive = true;
 
             // Safety net: route snapshot / EquipNewPage may still leave EGO pages inside
             // current decks (e.g. atlas-recorded EGO ids). Move them back to inventory so
@@ -1795,7 +1874,6 @@ namespace RogueLike_Mod_Reborn
             try { RMRPrepareRestrictions.StripEgoPagesFromPlayerDecks(); }
             catch (Exception ex) { Debug.LogWarning("[RMRRealizationManager] StripEgoPagesFromPlayerDecks: " + ex.Message); }
 
-            CompendiumOnlyLoadoutActive = true;
             Debug.Log($"[RMRRealizationManager] Applied atlas-only loadout: books={atlasBooks.Count}, cards={atlasCards.Count}, librarians={teamList.Count}");
             return true;
         }
@@ -1849,6 +1927,31 @@ namespace RogueLike_Mod_Reborn
                             try { unit.AddCardFromInventory(cardId); } catch { }
                         }
                     }
+                    // EquipNewPage releases inherited passives from the reused route librarian.
+                    // Rebuild the exact saved passive models and their donor-instance bookkeeping.
+                    if (unit.bookItem != null)
+                    {
+                        unit.bookItem.instanceId = ds.BookInstanceId;
+                        if (unit.bookItem.originData != null)
+                            unit.bookItem.originData.equipedBookIdListInPassive = ds.EquippedPassiveBookInstanceIds == null
+                                ? new List<int>()
+                                : new List<int>(ds.EquippedPassiveBookInstanceIds);
+                        List<PassiveModel> activePassives = LogLikeMod.GetFieldValue<List<PassiveModel>>(unit.bookItem, "_activatedAllPassives");
+                        if (activePassives != null)
+                        {
+                            activePassives.RemoveAll(passive => passive?.originData != null
+                                && passive.originData.receivepassivebookId != unit.bookItem.instanceId);
+                            if (ds.InheritedPassives != null)
+                            {
+                                foreach (SaveData savedPassive in ds.InheritedPassives)
+                                {
+                                    PassiveModel restoredPassive = new PassiveModel(unit.bookItem.instanceId);
+                                    restoredPassive.LoadFromSaveDataPassiveModel(savedPassive);
+                                    activePassives.Add(restoredPassive);
+                                }
+                            }
+                        }
+                    }
                     // Restore custom name
                     if (!string.IsNullOrEmpty(ds.CustomName))
                     {
@@ -1856,6 +1959,15 @@ namespace RogueLike_Mod_Reborn
                     }
                 }
             }
+
+            if (RouteBookOwnerSnapshot != null)
+            {
+                foreach (KeyValuePair<BookModel, UnitDataModel> owner in RouteBookOwnerSnapshot)
+                    owner.Key?.SetOwner(owner.Value);
+            }
+            LogueBookModels.Grade6SpecialBuiltInDeckSource = RouteGrade6SpecialDeckSourceSnapshot == null
+                ? new Dictionary<UnitDataModel, LorId>()
+                : new Dictionary<UnitDataModel, LorId>(RouteGrade6SpecialDeckSourceSnapshot);
 
             CompendiumOnlyLoadoutActive = false;
             Debug.Log("[RMRRealizationManager] Restored route loadout from snapshot.");

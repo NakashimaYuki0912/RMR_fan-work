@@ -6233,6 +6233,132 @@ namespace RogueLike_Mod_Reborn
         }
     }
 
+    /// <summary>
+    /// Upgrade-aware version of the Red Mist vertical slash.
+    /// Vanilla compares other copies against the bare 607003 LorId, which excludes
+    /// upgraded copies whose packageId stores RMR upgrade metadata.
+    /// </summary>
+    public class DiceCardSelfAbility_RMR_kaliNormalAttackJ : DiceCardSelfAbilityBase
+    {
+        private int _totalDamage;
+
+        public override string[] Keywords => new string[] { "DrawCard_Keyword" };
+
+        public override void OnUseCard()
+        {
+            _totalDamage = 0;
+        }
+
+        public override void AfterGiveDamage(int damage, BattleUnitModel target)
+        {
+            _totalDamage += damage;
+        }
+
+        public override void OnEndBattle()
+        {
+            if (_totalDamage < 8 || owner?.allyCardDetail == null || card?.card == null)
+                return;
+
+            LorId usedOriginId = card.card.GetID()?.GetOriginalId();
+            if (usedOriginId == null || usedOriginId == LorId.None)
+                return;
+
+            foreach (BattleDiceCardModel other in owner.allyCardDetail.GetAllDeck())
+            {
+                if (other == null || other == card.card)
+                    continue;
+                LorId otherId = other.GetID();
+                if (otherId != null && otherId.GetOriginalId() == usedOriginId)
+                    other.AddCost(-1);
+            }
+            owner.allyCardDetail.DrawCards(1);
+        }
+    }
+
+    /// <summary>
+    /// Upgrade-aware version of the Red Mist greatsword thrust.
+    /// Vanilla compares other copies against the bare 607004 LorId, which excludes
+    /// upgraded copies whose packageId stores RMR upgrade metadata.
+    /// </summary>
+    public class DiceCardSelfAbility_RMR_kaliNormalAttackZ : DiceCardSelfAbilityBase
+    {
+        private int _totalDamage;
+
+        public override string[] Keywords => new string[] { "DrawCard_Keyword" };
+
+        public override void OnUseCard()
+        {
+            _totalDamage = 0;
+        }
+
+        public override void AfterGiveDamage(int damage, BattleUnitModel target)
+        {
+            _totalDamage += damage;
+        }
+
+        public override void OnEndBattle()
+        {
+            if (_totalDamage < 8 || owner?.allyCardDetail == null || card?.card == null)
+                return;
+
+            LorId usedOriginId = card.card.GetID()?.GetOriginalId();
+            if (usedOriginId == null || usedOriginId == LorId.None)
+                return;
+
+            foreach (BattleDiceCardModel other in owner.allyCardDetail.GetAllDeck())
+            {
+                if (other == null || other == card.card)
+                    continue;
+                LorId otherId = other.GetID();
+                if (otherId != null && otherId.GetOriginalId() == usedOriginId)
+                    other.AddCost(-1);
+            }
+            owner.allyCardDetail.DrawCards(1);
+        }
+    }
+
+    /// <summary>
+    /// Upgrade-aware version of the Red Mist horizontal slash.
+    /// Vanilla compares other copies against the bare 607005 LorId, which excludes
+    /// upgraded copies whose packageId stores RMR upgrade metadata.
+    /// </summary>
+    public class DiceCardSelfAbility_RMR_kaliNormalAttackH : DiceCardSelfAbilityBase
+    {
+        private int _totalDamage;
+
+        public override string[] Keywords => new string[] { "Energy_Keyword" };
+
+        public override void OnUseCard()
+        {
+            _totalDamage = 0;
+        }
+
+        public override void AfterGiveDamage(int damage, BattleUnitModel target)
+        {
+            _totalDamage += damage;
+        }
+
+        public override void OnEndBattle()
+        {
+            if (_totalDamage < 8 || owner?.allyCardDetail == null || card?.card == null)
+                return;
+
+            LorId usedOriginId = card.card.GetID()?.GetOriginalId();
+            if (usedOriginId == null || usedOriginId == LorId.None)
+                return;
+
+            foreach (BattleDiceCardModel other in owner.allyCardDetail.GetAllDeck())
+            {
+                if (other == null || other == card.card)
+                    continue;
+                LorId otherId = other.GetID();
+                if (otherId != null && otherId.GetOriginalId() == usedOriginId)
+                    other.AddCost(-1);
+            }
+            owner.cardSlotDetail.RecoverPlayPointByCard(2);
+        }
+    }
+
     /// <summary>Card self-ability: DiceCardSelfAbility_RMR_Amputation</summary>
 
     public class DiceCardSelfAbility_RMR_Amputation : DiceCardSelfAbilityBase

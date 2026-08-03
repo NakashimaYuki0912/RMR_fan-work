@@ -67,7 +67,7 @@ namespace RogueLike_Mod_Reborn
 
         /// <summary>
         /// 解放战出战层书页章节上限：
-        /// 历史/科技/文学/艺术 → 都市梦魇(5)；总类 → 杂质(7)；其余 → 都市之星(6)。
+        /// 历史/科技/文学/艺术 → 都市之星(6)；其余解放战 → 杂质(7)。
         /// </summary>
         public static int GetRealizationMaxChapter(SephirahType floor)
         {
@@ -77,11 +77,11 @@ namespace RogueLike_Mod_Reborn
                 case SephirahType.Yesod:   // 科技
                 case SephirahType.Hod:     // 文学
                 case SephirahType.Netzach: // 艺术
-                    return ChapterUrbanNightmare;
+                    return ChapterUrbanStar;
                 case SephirahType.Keter:   // 总类
                     return ChapterImpurity;
                 default:
-                    return ChapterUrbanStar;
+                    return ChapterImpurity;
             }
         }
 
@@ -133,6 +133,10 @@ namespace RogueLike_Mod_Reborn
         {
             if (card == null)
                 return 99;
+            // Argalia's RMR reward pages are granted together with his core page at
+            // Urban Star progression even though the vanilla XML labels them Chapter 7.
+            if (RMRCore.IsBlueReverberationBattlePage(card.id))
+                return ChapterUrbanStar;
             int ch = card.Chapter;
             if (ch <= 0)
                 ch = 1;
@@ -181,14 +185,30 @@ namespace RogueLike_Mod_Reborn
 
         public static List<BookModel> FilterEquipInventoryBooks(List<BookModel> source)
         {
+            return FilterRealizationCompendiumBooks(source);
+        }
+
+        /// <summary>
+        /// The caller supplies LogueBookModels.booklist. During Realization that list
+        /// is the temporary projection built exclusively from permanent Compendium
+        /// unlocks; outside Realization it is the current RMR route inventory.
+        /// Never merge BookInventoryModel's vanilla result here: doing so exposes
+        /// unearned pages such as Pluto and Jae-heon. The selected floor's chapter
+        /// cap is then applied without changing the authoritative RMR source.
+        /// </summary>
+        public static List<BookModel> FilterRealizationCompendiumBooks(List<BookModel> source)
+        {
             if (source == null)
                 return new List<BookModel>();
-            if (!IsRealizationPrepareContext())
-                return source;
             var result = new List<BookModel>();
             foreach (BookModel book in source)
             {
                 if (book?.ClassInfo == null)
+                    continue;
+                // RMR librarians keep a private -854..-858 shell whose XML is mutated to
+                // represent the equipped collectible page. It is an implementation detail,
+                // never another inventory item the player can equip.
+                if (RMRCore.IsInternalLibrarianShell(book.ClassInfo.id))
                     continue;
                 if (!IsBookAllowedInCurrentPrepare(book.ClassInfo))
                     continue;

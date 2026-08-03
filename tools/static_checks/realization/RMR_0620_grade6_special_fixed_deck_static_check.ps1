@@ -45,8 +45,8 @@ Assert-Match 'Black Silence fixed deck falls back to vanilla deck 102' $models '
 Assert-Match 'Binah degraded-to-full upgrade map exists' $models '607201,\s*706201'
 Assert-Match 'Binah upgrade applies to fixed deck loads' $models 'ApplyBinahCardUpgradesInPlace'
 Assert-Match 'Binah upgrade state is saved' $models 'binahUpgradedCards'
-Assert-NoMatch 'Red Mist is not treated as a fixed built-in deck page' ([regex]::Match($models, 'IsGrade6SpecialBuiltInDeckPage\(BookXmlInfo page\)(?<body>[\s\S]*?)private static bool IsDeckFixedBookCategory').Groups['body'].Value) 'IsRedMistCorePage'
-$fixedDeckBody = [regex]::Match($models, 'IsGrade6SpecialBuiltInDeckPage\(BookXmlInfo page\)(?<body>[\s\S]*?)private static BookXmlInfo ResolveFreshEquipPage').Groups['body'].Value
+$fixedDeckBody = [regex]::Match($models, 'IsGrade6SpecialBuiltInDeckPage\(BookXmlInfo page\)(?<body>[\s\S]*?)public static bool IsUrbanStarSpecialCorePage').Groups['body'].Value
+Assert-NoMatch 'Red Mist is not treated as a fixed built-in deck page' $fixedDeckBody 'IsRedMistCorePage'
 Assert-Match 'Blue Reverberation is explicitly excluded from fixed-deck pages' $fixedDeckBody 'IsBlueReverberationCorePage\(page\)[\s\S]*return false'
 Assert-Match 'Blue Reverberation editable deck helper exists' $models 'IsEditableBlueReverberationDeck'
 Assert-Match 'stale Blue Reverberation fixed deck source is cleared' $models 'RMRCore\.IsBlueReverberationCorePage\(model\.bookItem\?\.ClassInfo\)[\s\S]*Grade6SpecialBuiltInDeckSource\.Remove\(model\)'

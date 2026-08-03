@@ -161,14 +161,14 @@ namespace RogueLike_Mod_Reborn
                         "【图鉴限制】\n" +
                         "解放战中的核心书页、战斗书页、异想体书页与 E.G.O.战斗书页，都必须从永久图鉴已经收集的内容中选取；未记录的书页不能直接使用。\n\n" +
                         "【章节限制】\n" +
-                        "历史、艺术、科技与文学层解放战只能使用都市梦魇及以下章节的战斗书页与核心书页，以保留对应阶段的构筑体验。\n\n" +
+                        "历史、艺术、科技与文学层解放战只能使用都市之星及以下章节的战斗书页与核心书页；其余楼层可使用已收录的杂质章节书页。\n\n" +
                         "【首次通关奖励】\n" +
                         "首次完成某层解放战后，该层专属异想体书页会加入后续关卡掉落池，对应 E.G.O.战斗书页会在满足条件的 Boss 战后出现。已经通关的楼层可以再战，但不会重复发放首通奖励。\n\n" +
                         "【临时编队】\n" +
                         "解放战使用临时编队，战后会恢复正常路线配置，不会污染当前旅程。",
                     BodyEn =
                         "[Compendium limit]\nAll key, combat, abnormality, and E.G.O. pages used in a realization must already be recorded in the permanent Compendium.\n\n" +
-                        "[Chapter limit]\nMalkuth, Netzach, Yesod, and Hod realizations only allow key and combat pages from Urban Nightmare or earlier.\n\n" +
+                        "[Chapter limit]\nMalkuth, Netzach, Yesod, and Hod realizations only allow key and combat pages from Star of the City or earlier. Later floors may use owned Impurity pages.\n\n" +
                         "[First-clear rewards]\nA first clear adds that floor's exclusive abnormality pages to later reward pools and makes its E.G.O. eligible after suitable bosses. Replays do not repeat these rewards.\n\n" +
                         "[Temporary loadout]\nRealization teams are temporary; the normal-run setup is restored afterward."
                 },

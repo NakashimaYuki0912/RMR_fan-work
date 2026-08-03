@@ -1490,12 +1490,8 @@ namespace abcdcode_LOGLIKE_MOD
         /// <summary>RMR starter librarian shells — not collectible atlas content.</summary>
         private static bool IsRmrInternalRoleBook(LorId id)
         {
-            if (id == null)
-                return false;
             // 旅途指定司书之页 (-854), 旅途助理司书之页 (-855) and assistant slots -856..
-            if (id.id == -854 || id.id == -855 || id.id == -856 || id.id == -857 || id.id == -858)
-                return true;
-            return false;
+            return RMRCore.IsInternalLibrarianShell(id);
         }
 
         private static bool IsRmrInternalRoleBookTitle(string title)

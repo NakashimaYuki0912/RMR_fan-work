@@ -121,6 +121,8 @@ namespace abcdcode_LOGLIKE_MOD
         {
             if (LogueBookModels.CompendiumUnlockedRoleBooks == null)
                 LogueBookModels.CompendiumUnlockedRoleBooks = new HashSet<LorId>();
+            else
+                LogueBookModels.CompendiumUnlockedRoleBooks.RemoveWhere(RMRCore.IsInternalLibrarianShell);
             if (LogueBookModels.CompendiumUnlockedBattleCards == null)
                 LogueBookModels.CompendiumUnlockedBattleCards = new HashSet<LorId>();
             if (LogueBookModels.CompendiumUnlockedAbnormalityPages == null)
@@ -266,6 +268,7 @@ namespace abcdcode_LOGLIKE_MOD
             HashSet<LorId> exclusiveCards = LogueBookModels.GetCorePageExclusiveBattleCardIds();
             exclusiveCards.RemoveWhere(IsRedMistRewardBattleCard);
             exclusiveCards.RemoveWhere(IsBlueReverberationRewardBattleCard);
+            exclusiveCards.RemoveWhere(IsExplicitlyObtainableExclusiveBattleCard);
             if (exclusiveCards.Count == 0)
                 return;
             if (LogueBookModels.cardlist != null)
@@ -304,11 +307,12 @@ namespace abcdcode_LOGLIKE_MOD
 
         private static bool IsBlueReverberationRewardBattleCard(LorId id)
         {
-            return id != null
-                && (id.id == 704001
-                    || (id.id >= 704011 && id.id <= 704014)
-                    || id.id == 705010
-                    || id.id == 705011);
+            return RMRCore.IsBlueReverberationBattlePage(id);
+        }
+
+        private static bool IsExplicitlyObtainableExclusiveBattleCard(LorId id)
+        {
+            return id != null && id.id == 608004;
         }
 
         public static void PruneInvalidPermanentAbnormalityCompendiumUnlocks()
@@ -473,6 +477,7 @@ namespace abcdcode_LOGLIKE_MOD
 
         public static void LoadFromSaveData_UnitBattleDataModel(SaveData data, UnitBattleDataModel model)
         {
+            DetachPlayerBookClassInfo(model?.unitData);
             BookXmlInfo classInfo = model.unitData.bookItem.ClassInfo;
             model.hp = (float)data.GetData("hp").GetIntSelf();
             model.isDead = data.GetData("isDead").GetIntSelf() == 1;
@@ -2011,6 +2016,7 @@ namespace abcdcode_LOGLIKE_MOD
 
         public static void ResetPlayerData(UnitDataModel player)
         {
+            DetachPlayerBookClassInfo(player);
             if (LogueBookModels.BaseEquipStat == null)
             {
                 LogueBookModels.BaseEquipStat = LogueBookModels.CopyEquipEffect(player.bookItem.ClassInfo.EquipEffect);
@@ -2140,16 +2146,50 @@ namespace abcdcode_LOGLIKE_MOD
 
         public static BookXmlInfo CopyBookXmlInfo(BookXmlInfo original)
         {
+            if (original == null)
+                return null;
             return new BookXmlInfo()
             {
+                _id = original._id,
+                isError = original.isError,
+                workshopID = original.workshopID,
+                InnerName = original.InnerName,
                 _bookIcon = original._bookIcon,
                 TextId = original.TextId,
+                optionList = original.optionList == null
+                    ? new List<BookOption>()
+                    : new List<BookOption>(original.optionList),
+                categoryList = original.categoryList == null
+                    ? new List<BookCategory>()
+                    : new List<BookCategory>(original.categoryList),
+                Rarity = original.Rarity,
                 Chapter = original.Chapter,
-                CharacterSkin = new List<string>((IEnumerable<string>)original.CharacterSkin),
+                episode = original.episode,
+                CharacterSkin = original.CharacterSkin == null
+                    ? new List<string>()
+                    : new List<string>(original.CharacterSkin),
                 skinType = original.skinType,
+                gender = original.gender,
                 RangeType = original.RangeType,
+                canNotEquip = original.canNotEquip,
+                RandomFace = original.RandomFace,
+                speedDiceNumber = original.speedDiceNumber,
+                SuccessionPossibleNumber = original.SuccessionPossibleNumber,
+                motionSoundList = original.motionSoundList == null
+                    ? new List<CustomInvitation.BookSoundInfo>()
+                    : new List<CustomInvitation.BookSoundInfo>(original.motionSoundList),
+                remainRewardValue = original.remainRewardValue,
                 EquipEffect = LogueBookModels.CopyEquipEffect(original.EquipEffect)
             };
+        }
+
+        private static void DetachPlayerBookClassInfo(UnitDataModel unitData)
+        {
+            BookModel book = unitData?.bookItem;
+            BookXmlInfo current = book?.ClassInfo;
+            if (current == null)
+                return;
+            book.SetXmlInfo(CopyBookXmlInfo(current));
         }
 
         public static BookEquipEffect CopyEquipEffect(BookEquipEffect original)
@@ -2165,7 +2205,9 @@ namespace abcdcode_LOGLIKE_MOD
                 HpReduction = original.HpReduction,
                 HResist = original.HResist,
                 MaxPlayPoint = original.MaxPlayPoint,
-                OnlyCard = original.OnlyCard,
+                OnlyCard = original.OnlyCard == null
+                    ? new List<int>()
+                    : new List<int>(original.OnlyCard),
                 PassiveCost = original.PassiveCost,
                 PassiveList = new List<LorId>((IEnumerable<LorId>)original.PassiveList),
                 PBResist = original.PBResist,
@@ -2277,6 +2319,10 @@ namespace abcdcode_LOGLIKE_MOD
                 return;
             page = ResolveFreshEquipPage(page);
             UnitDataModel unitData = model.unitData;
+            // RMR represents a librarian with a private -854..-858 shell and copies the
+            // selected collectible page onto it. Never mutate BookXmlList's shared XML:
+            // doing so turns the inventory shell itself into a Black Silence/Olivier clone.
+            DetachPlayerBookClassInfo(unitData);
             float num = model.hp / (float)model.MaxHp;
             double hpReductionMod = model.hp;
             foreach (PassiveAbilityBase passive in unitData.bookItem.CreatePassiveList())
@@ -2434,6 +2480,7 @@ namespace abcdcode_LOGLIKE_MOD
             if (LogueBookModels.playerModel.Count >= 5)
                 return;
             UnitDataModel unitDataModel = new UnitDataModel(new LorId(LogLikeMod.ModId, -854 - LogueBookModels.playerModel.Count));
+            DetachPlayerBookClassInfo(unitDataModel);
             unitDataModel.bookItem.instanceId = LogueBookModels.nextinstanceid++;
             unitDataModel.bookItem.ClassInfo.EquipEffect.PassiveList.Clear();
             try

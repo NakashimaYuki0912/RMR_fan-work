@@ -60,15 +60,26 @@ foreach ($file in Get-ChildItem $root -Recurse -Filter *.cs |
         if ($sig -notmatch '\(([^)]*)\)') { continue }
         $paramBlob = $Matches[1]
         if (-not $paramBlob.Trim()) { continue }
+        $isPassThroughPostfix = $line -match 'HarmonyPostfix' -and
+            $sig -match '\bstatic\s+(?!void\b)(?<returnType>[\w\.<>\[\],]+)\s+\w+\s*\('
+        $passThroughReturnType = if ($isPassThroughPostfix) { $Matches['returnType'] } else { $null }
 
         $key = "$typeName.$methodName"
         if (-not $vanilla.ContainsKey($key)) { continue }   # not a vanilla type (RMR's own class)
         $known = $vanilla[$key]
         $checked++
 
-        foreach ($p in ($paramBlob -split ',')) {
+        $parameters = @($paramBlob -split ',')
+        for ($parameterIndex = 0; $parameterIndex -lt $parameters.Count; $parameterIndex++) {
+            $p = $parameters[$parameterIndex]
             $p = $p.Trim()
             if (-not $p) { continue }
+            if ($parameterIndex -eq 0 -and $isPassThroughPostfix) {
+                $parameterType = (($p -split '\s+')[0] -replace '\s', '')
+                if ($parameterType -eq ($passThroughReturnType -replace '\s', '')) {
+                    continue
+                }
+            }
             $name = ($p -split '\s+')[-1].TrimStart('@')
             if ($special -contains $name) { continue }
             if ($name -like '___*') { continue }            # private field injection
