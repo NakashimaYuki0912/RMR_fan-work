@@ -23,7 +23,7 @@ Player.log:
 
 - 外层 `D:\VS_program\ruina-roguelike-reborn-main\` **没有** `.git`。  
 - 原作者对照：`D:\VS_program\ruina-roguelike-reborn-main\original-codes\`（只读）。
-- 当前 GitHub `origin`：`https://github.com/NakashimaYuki0912/RMR_private.ver`（以 `git remote -v` 为准）。
+- 当前 GitHub `origin`：`https://github.com/NakashimaYuki0912/RMR_fan-work.git`（以 `git remote -v` 为准）。
 
 **本机日常测试用 `deploy_local.ps1`，不是 `deploy_workshop.ps1`。** 两者 ModId 相同，
 Mod 列表里只能启用一个，否则互相顶掉（玩家反馈「杂质章节不存在」多半就是这个原因）。
