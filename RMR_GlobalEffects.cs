@@ -1041,7 +1041,13 @@ namespace RogueLike_Mod_Reborn
         public override void AddedNew()
         {
             base.AddedNew();
-            MysteryModel_CardChoice.PopupCardChoice(LogueBookModels.GetCardList(false, true), new MysteryModel_CardChoice.ChoiceResult(Effect), MysteryModel_CardChoice.ChoiceDescType.ChooseDesc);
+            List<DiceCardItemModel> cards = LogueBookModels.GetCardList(false, true);
+            if (cards == null || cards.Count == 0 || !cards.Exists(c => c != null && c.num > 0))
+            {
+                Debug.LogWarning("[RMR] StasisBlaze: no sealable combat pages; effect kept without a sealed card.");
+                return;
+            }
+            MysteryModel_CardChoice.PopupCardChoice(cards, new MysteryModel_CardChoice.ChoiceResult(Effect), MysteryModel_CardChoice.ChoiceDescType.ChooseDesc);
             
         }
 
@@ -1096,7 +1102,13 @@ namespace RogueLike_Mod_Reborn
         public override void AddedNew()
         {
             base.AddedNew();
-            MysteryModel_CardChoice.PopupCardChoice(LogueBookModels.GetCardList(false, true), new MysteryModel_CardChoice.ChoiceResult(Effect), MysteryModel_CardChoice.ChoiceDescType.ChooseDesc);
+            List<DiceCardItemModel> cards = LogueBookModels.GetCardList(false, true);
+            if (cards == null || cards.Count == 0 || !cards.Exists(c => c != null && c.num > 0))
+            {
+                Debug.LogWarning("[RMR] StasisSpark: no sealable combat pages; effect kept without a sealed card.");
+                return;
+            }
+            MysteryModel_CardChoice.PopupCardChoice(cards, new MysteryModel_CardChoice.ChoiceResult(Effect), MysteryModel_CardChoice.ChoiceDescType.ChooseDesc);
 
         }
 
@@ -1159,15 +1171,14 @@ namespace RogueLike_Mod_Reborn
         public override void AddedNew()
         {
             base.AddedNew();
-            MysteryModel_CardChoice.PopupCardChoice(LogueBookModels.GetCardList(false, true), new MysteryModel_CardChoice.ChoiceResult(Effect), MysteryModel_CardChoice.ChoiceDescType.ChooseDesc);
+            List<DiceCardItemModel> cards = LogueBookModels.GetCardList(false, true);
+            if (cards == null || cards.Count == 0 || !cards.Exists(c => c != null && c.num > 0))
+            {
+                Debug.LogWarning("[RMR] StasisLight: no sealable combat pages; effect kept without a sealed card.");
+                return;
+            }
+            MysteryModel_CardChoice.PopupCardChoice(cards, new MysteryModel_CardChoice.ChoiceResult(Effect), MysteryModel_CardChoice.ChoiceDescType.ChooseDesc);
 
-        }
-
-        public override SaveData GetSaveData()
-        {
-            SaveData data = base.GetSaveData();
-            data.AddData("RMRStatisLight", card.LogGetSaveData());
-            return data;
         }
 
         public override void LoadFromSaveData(SaveData save)

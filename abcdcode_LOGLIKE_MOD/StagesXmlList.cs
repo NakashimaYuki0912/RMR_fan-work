@@ -71,15 +71,34 @@ namespace abcdcode_LOGLIKE_MOD
 
         public LogueStageInfo GetStageInfo(LorId stageid)
         {
+            return GetStageInfo(stageid, preferredType: null);
+        }
+
+        /// <summary>
+        /// Resolve a stage template by id. When <paramref name="preferredType"/> is set,
+        /// prefer an entry whose StageType matches (avoids Rest/Shop ID collisions).
+        /// </summary>
+        public LogueStageInfo GetStageInfo(LorId stageid, StageType? preferredType)
+        {
+            if (stageid == null || this.infos == null)
+                return null;
+
+            LogueStageInfo fallback = null;
             foreach (StagesXmlInfo info in this.infos)
             {
+                if (info?.Stages == null)
+                    continue;
                 foreach (LogueStageInfo stage in info.Stages)
                 {
-                    if (stage.Id == stageid)
+                    if (stage == null || stage.Id != stageid)
+                        continue;
+                    if (preferredType.HasValue && stage.type == preferredType.Value)
                         return stage.Copy();
+                    if (fallback == null)
+                        fallback = stage;
                 }
             }
-            return (LogueStageInfo)null;
+            return fallback != null ? fallback.Copy() : null;
         }
 
         public void RestoreToDefault()

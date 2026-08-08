@@ -50,7 +50,7 @@ git log -5 --oneline
 # 确认存在 RogueLike Mod Reborn.csproj 与 RMR_Core.cs
 ```
 
-### 0.3 历史事故（读过再改 UI）
+### 0.3 历史事故（读过再改 UI / 存档 / 选页）
 
 多名 agent（含 **DeepSeek**）曾造成：
 
@@ -58,8 +58,9 @@ git log -5 --oneline
 - 中文 **糊到看不清**（伪粗体 + 错误 SDF 材质）
 - Localize 文件 **编码污染**
 - 改了源码 **未部署 / 用户仍测旧 DLL**
+- **情感 SelectOne（巨目等）可选多人、全队生效后卡住**（坏档 + 选页副作用抛异常打断 UI）
 
-**铁律摘要**（细节见 handbook 01）：
+**铁律摘要**（细节见 handbook 01 / 05）：
 
 ```csharp
 // ✅ 唯一推荐
@@ -73,6 +74,8 @@ tmp.fontStyle = FontStyles.Bold;
 ```
 
 中文主字体应为 **`NotoSansCJKsc-Regular SDF`**（`LocalizedFontSetter.cnFont_notoSansCJKsc`），不是 `font_NotoSans` 韩文路径。
+
+存档 / 选页铁律摘要见 **§3.6**（完整禁区：[05-forbidden-and-safe-patterns.md](docs/agent-handbook/05-forbidden-and-safe-patterns.md) §16–18）。
 
 ---
 
@@ -96,9 +99,10 @@ LoR-RMR 把《Library of Ruina》改成按章节推进的 Roguelike：普通战 
 | 解放战 | `RMR_RealizationManager.cs`、`LogRealizationPanel.cs` | Stage 包语义、配置污染 |
 | 异想体 / E.G.O. | `RMR_AbnormalityUnlocks.cs` | EmotionLevel 错、未解放进池 |
 | 结算奖励 | `RewardingModel.cs`、`PickUpModel_*` | 队列死循环、误 EndBattle |
+| 情感选页 / SelectOne | `LogLikePatches.StageLibraryFloorModel_OnPickPassiveCard`、`PickUpModel_RMRVanillaEmotion` | 连点多人、全队叠效、UI 软锁 |
 | 商店 | `ShopBase.cs`、`ShopGoods_*` | 重叠、软锁、布局 |
 | 神秘事件 | `MysteryBase.cs`、`MysteryModel_*` | NRE、离开软锁 |
-| 图鉴 / 存档 | `LogCompendiumPanel.cs`、`LogueBookModels.cs`（Compendium* API） | 永久 vs 路线混淆；磁盘键仍可能含 atlas |
+| 图鉴 / 存档 | `LogCompendiumPanel.cs`、`LogueBookModels.cs`、`LogueSaveManager.cs` | 永久 vs 路线混淆；坏档 / 截断写盘 |
 | Harmony | `abcdcode_Refactored/LogLikePatches.cs` | 补丁冲突 |
 | 字体 / 本地化 | `LogLikeMod.cs`、`ModdingUtils.cs` | 口口口、糊字 |
 
@@ -200,6 +204,48 @@ LoR-RMR 把《Library of Ruina》改成按章节推进的 Roguelike：普通战 
 - 仅 **已拥有** E.G.O. 可出现在中段选择。
 - 禁止开局 bulk grant 淹没手牌导致只能 Pass。
 - 禁止误触发 EndBattle / 清场（见 `IsLiveCombatBothSidesAlive` 等 guard）。
+- 情感 1–5 **每次**先选异想体；3/4/5 在异想体**选完之后**再开中段 E.G.O.（`ArmMidBattleEgoAfterEmotionIfNeeded` 只能在 `OnEmotionPagePicked` 之后调用）。
+- **禁止**在 `PickEmotion` / 打开异想体 UI 时就 Arm E.G.O.——会与 `EmotionChoice` 竞态，E.G.O. 盖掉异想体，出现「情感 V 但只有 3 张异想体生效」。
+
+### 3.6 存档写入与情感选页软锁（不可回退）
+
+> 2026-08-07 血泪史：SelectOne「巨目」选完一个司书后仍可继续选、作用全队并卡住。  
+> 根因链：`File.Create(目标档)` 截断 → 崩溃留下空/全 0 的 `RMR_ItemCatalog` → 选页收尾 `AddToObtainCount` → `LoadData` 抛 `SerializationException` → `LevelUpUI.OnClickTargetUnit` 未跑完 → UI 不关。  
+> 次因：`PickUpModel_RMRVanillaEmotion` 无参 `OnPickUp()` 曾对全队生效，与 SelectOne 叠打。
+
+#### 3.6.1 磁盘存档（`LogueSave/*`）
+
+- **唯一写入口**：`LogueSaveManager.SaveData` / `LoadData` / `RemoveData` / `AddToObtainCount`。
+- **禁止**对最终路径直接 `File.Create` + `BinaryFormatter.Serialize`（会先截断；进程死掉 → 空档）。
+- `SaveData` 必须：**先写 `*.tmp` → 校验非空 → `File.Replace`（或等价原子替换）到目标名**。
+- `LoadData` 必须：捕获反序列化失败 / 空文件 → **隔离**（`.corrupt_时间戳`）或删除 → 返回 `null`，**禁止抛到战斗 / 选页 UI**。
+- `AddToObtainCount`、图鉴统计等 **非关键副作用**：失败只打日志，不得阻断商店购买、情感选页、奖励队列推进。
+- 调用方读 catalog：`LoadData(...)` 后必须 **null 检查**再 `GetInt` / `GetData`（勿写 `LoadData(...).GetInt(...)` 裸链）。
+- 磁盘目录：`%USERPROFILE%\AppData\LocalLow\Project Moon\LibraryOfRuina\LogueSave\`（键名如 `RMR_ItemCatalog`、`Lastest`、永久图鉴等 **勿擅自改名**）。
+
+#### 3.6.2 情感 / 奖励选页收尾（`OnPickPassiveCard`）
+
+- Hook：`LogLikePatches.StageLibraryFloorModel_OnPickPassiveCard`（替换原版路径时，抛异常 = 选人 UI 软锁）。
+- **Apply 整段必须 try/catch**；catch 后仍应推进 `PassiveReward` / `RewardInStage` 队列（空集合短路）。
+- 目标施加必须 **互斥**：
+  - `All` / `AllIncludingEnemy` → 只走全队循环；
+  - **否则** `target != null` → 只对该司书 `OnPickUp(target)`；
+  - `SelectOne` 且 `target == null` → 打 Warning，**禁止**回落成全队。
+- 禁止 `if (All) {…} if (target != null) {…}` 这种双分支叠打。
+
+#### 3.6.3 原版情感 Pickup（`PickUpModel_RMRVanillaEmotion`）
+
+- **无参** `OnPickUp()`：**必须为空**（Hook 在 SelectOne/All 施加之后总会再调一次）。
+- 真正生效只在 `OnPickUp(BattleUnitModel model)`。
+- 禁止在无参里 `GetList(Faction.Player)` 全队 `ApplyTo`——否则 SelectOne 双份图标 / 双战斗书页 /「全队都有」。
+
+#### 3.6.4 改动后必跑静态检查
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\static_checks\runtime_release\RMR_0807_save_atomic_emotion_softlock_static_check.ps1
+```
+
+游戏内抽测：中段 / 结算出现 **SelectOne** 异想体书页（如巨目）→ 只点一名司书 → UI 关闭且战斗可继续；`Player.log` 无 `Binary stream '0' does not contain a valid BinaryHeader` 源于选页瞬间。
 
 ---
 
@@ -213,6 +259,7 @@ LoR-RMR 把《Library of Ruina》改成按章节推进的 Roguelike：普通战 
 - 升级选择按都市章节分类。
 - 升级图标：`ArtWork/Shop_CardUpgrade_Icon.png`；无 Emoji 图标。
 - **离开商店 / 神秘 / 休息**：必须 `RewardingModel.MarkNonCombatNodeExit`，清免疫 NPC，并在选完下一层后仍保持 pending，直到 `RoundStart` 清除——否则卡死在奇悭球体类软锁。
+- **限时战斗胜利**（清道夫 `MysterySweeperTimer` / 三幕计时等）：用 `MarkForcedTimedCombatVictory`，**禁止** `MarkNonCombatNodeExit`。后者会跳过普通战入队奖励，且 `Die` 后再 `EndBattle` 易在未选下一层时走 vanilla FinalEnd（舞台落幕 / 整局结束）。重复 `EndBattle` 在奖励/nextlist 未清空时必须忽略。
 - 商店坐标：`ShopBase.CardShape`（静态，改后需重启游戏）。
 
 ---
@@ -239,8 +286,9 @@ LoR-RMR 把《Library of Ruina》改成按章节推进的 Roguelike：普通战 
 - 4 空格；PascalCase 类型 / 公开成员；camelCase 局部变量。
 - 修根因，禁魔法偏移堆叠。
 - 无无关大重构、无整文件格式化。
-- 存档字段：默认值 + 迁移 + 损坏回退。
-- 空集合短路正确，避免 NRE。
+- 存档字段：默认值 + 迁移 + 损坏回退；**写盘走 §3.6**，禁止旁路截断写。
+- 空集合短路正确，避免 NRE；`LoadData` 结果一律当可能为 null。
+- 战斗 / 选页 / 商店收尾路径上的 **非关键 I/O**（获得次数、统计、可选 UI）必须吞异常或走已加固 API。
 - 高频日志必须开关；勿在 `Update` 无条件刷 log。
 - 写权限失败时说明，不假装已写入。
 
@@ -261,6 +309,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\packaging\pack_mod.ps1   # 可�
 - 日志：`%USERPROFILE%\AppData\LocalLow\Project Moon\LibraryOfRuina\Player.log`
 - 搜索：`[RMR] RogueLike Mod Reborn initializing. Build:`
 - 静态脚本：`tools/static_checks/{realization,rewards,shop_atlas,events_abnormality,runtime_release}/`
+  - 改存档 / 情感选页时必跑：`runtime_release/RMR_0807_save_atomic_emotion_softlock_static_check.ps1`
 - 扫描 XML 时 **排除** `.bak`；备份在 `Assemblies\_codex_backups\`
 - 不要改 `_release_packages/` 代替源码
 - **禁止**游戏运行中覆盖 DLL
@@ -286,6 +335,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\packaging\pack_mod.ps1   # 可�
 - Hub 中文清晰、无口口口  
 - 解放战十层 Stage、配置恢复  
 - 情感 1–2 不出现科技终局 III 页  
+- **SelectOne 异想体书页只作用一名司书，选完 UI 关闭可继续**  
 - 商店 / 神秘离开后进入真正下一场  
 - 手牌可打出战斗页；中段 E.G.O. 仅已拥有  
 - 图鉴 / 永久记录不污染路线  
@@ -346,8 +396,9 @@ powershell -ExecutionPolicy Bypass -File .\tools\packaging\pack_mod.ps1   # 可�
 | [LoR_modding_background.md](LoR_modding_background.md) | LoR 模组背景 |
 | `RMR_abnormality_*.md` | 异想体设计草案 |
 | `tools/_vanilla_emotion_level_map.txt` | 原版 EmotionLevel 参考 |
+| `tools/static_checks/runtime_release/RMR_0807_save_atomic_emotion_softlock_static_check.ps1` | 存档原子写 + SelectOne 软锁防回归 |
 | `handoff.md` | 图鉴升级开关等**历史**任务（可能过时） |
 
 ---
 
-*维护者：后续 agent 修改重大规则时，请同步更新本文件 §3–5 与 `docs/agent-handbook/`。*
+*维护者：后续 agent 修改重大规则时，请同步更新本文件 §3–6 与 `docs/agent-handbook/`（含 §3.6 存档/选页软锁）。*

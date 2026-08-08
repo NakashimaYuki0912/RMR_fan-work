@@ -94,9 +94,21 @@ namespace abcdcode_LOGLIKE_MOD
 
         public override Sprite GetCraftSprite() => LogLikeMod.ArtWorks["Chapter7Icon_ExCard"];
 
-        public override string GetCraftName() => TextDataModel.GetText("CraftExCardChapter7Name");
+        public override string GetCraftName()
+        {
+            string text = TextDataModel.GetText("CraftExCardChapter7Name");
+            if (string.IsNullOrEmpty(text) || text == "CraftExCardChapter7Name")
+                return "Crafting Exclusive Combat Page - Impuritas Civitatis";
+            return text;
+        }
 
-        public override string GetCraftDesc() => TextDataModel.GetText("CraftExCardChapter7Desc");
+        public override string GetCraftDesc()
+        {
+            string text = TextDataModel.GetText("CraftExCardChapter7Desc");
+            if (string.IsNullOrEmpty(text) || text == "CraftExCardChapter7Desc")
+                return "Craft a random Impuritas Civitatis exclusive Combat Page (only exclusives from key pages in inventory).";
+            return text;
+        }
 
         public override int GetCraftCost() => 20;
 

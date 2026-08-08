@@ -109,7 +109,13 @@
 | 症状 | 根因 | 状态 |
 |---|---|---|
 | 商店/神秘选完下一层，卡在本场，空格开战但商人免疫 | 残留 NPC + 类型已变 Normal + EndBattle 恢复 | **已修** `NonCombatNodeExitPending` |
+| 清道夫限时胜后整局直接「舞台落幕」 | `MarkNonCombatNodeExit` + 二次 `EndBattle`→vanilla FinalEnd（尚无下一波） | **已修** `MarkForcedTimedCombatVictory` + 重复 EndBattle 守卫 |
+| 图鉴异想体书页贴图错乱 / 与战斗内图标不一致 | 图鉴用 `info.Artwork`（模组 `Creature_*` CG，且 bossbird/snowwhite 复用错图）；楼层用错误的 tier→楼层映射 | **已修** `Resources.Load(Sprites/CreatureArtworks/…)` + `GetFloorForScript`；`UIEmotionPassiveCardInven` 不再盲写空贴图 |
+| 续玩后升级书页要重新塞进牌组 | 升级换牌只 `slot.id == oldId`；牌组先于库存加载；旧档牌组仍存基础 ID | **已修** `NormalizeCardKey` 替换 + `ReconcileDecksWithOwnedUpgrades`；升级后立刻 `SavePlayData_Menu` |
 | 双方都活却进结算 | 情感 E.G.O. glitch | **已修** recovery |
+| SelectOne 异想体书页（巨目等）可选多人、全队生效后卡住 | `RMR_ItemCatalog` 坏档（`File.Create` 截断）→ `AddToObtainCount` 抛异常打断 `OnClickTargetUnit`；叠加无参 `OnPickUp` 全队 | **已修** 原子 `SaveData` + Load 隔离 + 选页 try/catch + 无参 OnPickUp 置空；静态检查 `RMR_0807_save_atomic_emotion_softlock_static_check.ps1` |
+| 宗教层解放战「打得好好的突然失败」 | Hokma 整场 `!IsStageFinishable` → 任意 `EndBattle` 都走「多阶段转发原版」；真实团灭未清理 / 误触发会直接拆场 | **已修** `StageController_EndBattle` 按存活人数分支：团灭=败北清理；双方都活=忽略；仅敌方空=波次转发 |
+| 情感 V 但只有 3 张异想体生效 | `PickEmotion` 打开异想体时就 Arm 中段 E.G.O.，`EmotionChoice` 下一轮在 `IsEnabled` 未就绪时用 E.G.O. 盖掉 4/5 异想体 | **已修** 改为异想体选完后再 `ArmMidBattleEgoAfterEmotionIfNeeded` |
 
 ---
 

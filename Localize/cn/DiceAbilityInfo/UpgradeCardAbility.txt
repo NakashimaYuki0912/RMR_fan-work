@@ -1628,5 +1628,17 @@ Otherwise deal 20 damage to self</Desc>
 下一幕中使自身获得4层[强壮]</Desc>
   </BattleCardAbility>
 
+  <!-- Red Mist upgraded normals: Script is swapped to RMR_* so cost-cut sees LogUpgrade copies.
+       Must keep vanilla wording or upgrade cards render with empty ability text. -->
+  <BattleCardAbility ID="RMR_kaliNormalAttackJ">
+    <Desc>若至少造成8点伤害则抽取1张书页并使其余同名书页费用-1</Desc>
+  </BattleCardAbility>
+  <BattleCardAbility ID="RMR_kaliNormalAttackZ">
+    <Desc>若至少造成8点伤害则抽取1张书页并使其余同名书页费用-1</Desc>
+  </BattleCardAbility>
+  <BattleCardAbility ID="RMR_kaliNormalAttackH">
+    <Desc>若至少造成8点伤害则恢复2点光芒并使其余同名书页费用-1</Desc>
+  </BattleCardAbility>
+
 </BattleCardAbilityDescRoot>
 

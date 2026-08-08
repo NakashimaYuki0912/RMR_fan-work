@@ -77,7 +77,7 @@ namespace RogueLike_Mod_Reborn
         public const string packageId = "abcdcodecalmmagma.LogueLikeReborn";
         public static CustomMapHandler RMRMapHandler;
 
-        public const string BuildTimestamp = "2026-08-03Tgithub-release-cleanup+08:00";
+        public const string BuildTimestamp = "2026-08-07Tupgrade-deck-reconcile+08:00";
 
         #endregion
 
@@ -564,13 +564,11 @@ namespace RogueLike_Mod_Reborn
             }
 
             // CREATE ITEM CATALOG IF IT DOES NOT EXIST
-            if (!File.Exists(LogueSaveManager.Saveroot + "/RMR_ItemCatalog"))
+            if (!File.Exists(Path.Combine(LogueSaveManager.Saveroot, "RMR_ItemCatalog")))
             {
-                SaveData data = new SaveData(SaveDataType.Dictionary);
-                using (FileStream fileStream = File.Create(LogueSaveManager.Saveroot + "/RMR_ItemCatalog"))
-                {
-                    new BinaryFormatter().Serialize(fileStream, data.GetSerializedData());
-                }
+                Singleton<LogueSaveManager>.Instance.SaveData(
+                    new SaveData(SaveDataType.Dictionary),
+                    "RMR_ItemCatalog");
             }
         }
 
@@ -2634,11 +2632,9 @@ namespace RogueLike_Mod_Reborn
             RMRAbnormalityUnlockManager.ResetArchiveProgress();
             if (!File.Exists(Path.Combine(LogueSaveManager.Saveroot, gamemode.SaveDataString)))
             {
-                SaveData data = new SaveData(SaveDataType.Dictionary);
-                using (FileStream fileStream = File.Create(Path.Combine(LogueSaveManager.Saveroot, gamemode.SaveDataString)))
-                {
-                    new BinaryFormatter().Serialize(fileStream, data.GetSerializedData());
-                }
+                Singleton<LogueSaveManager>.Instance.SaveData(
+                    new SaveData(SaveDataType.Dictionary),
+                    gamemode.SaveDataString);
             }
             else
             {
@@ -2665,11 +2661,9 @@ namespace RogueLike_Mod_Reborn
             RMRAbnormalityUnlockManager.ResetArchiveProgress();
             if (!File.Exists(Path.Combine(LogueSaveManager.Saveroot, gamemode.SaveDataString)))
             {
-                SaveData data = new SaveData(SaveDataType.Dictionary);
-                using (FileStream fileStream = File.Create(Path.Combine(LogueSaveManager.Saveroot, gamemode.SaveDataString)))
-                {
-                    new BinaryFormatter().Serialize(fileStream, data.GetSerializedData());
-                }
+                Singleton<LogueSaveManager>.Instance.SaveData(
+                    new SaveData(SaveDataType.Dictionary),
+                    gamemode.SaveDataString);
             }
             else
                 LogueSaveManager.Instance.RemoveData(gamemode.SaveDataString);
@@ -3728,10 +3722,14 @@ namespace RogueLike_Mod_Reborn
 
         public static int GetItemObtainCount(this GlobalLogueEffectBase item)
         {
-            try { 
-                int count = Singleton<LogueSaveManager>.Instance.LoadData("RMR_ItemCatalog").GetInt("ObtainCount_" + item.GetType().Name);
-                return count;
-            } catch
+            try
+            {
+                SaveData catalog = Singleton<LogueSaveManager>.Instance.LoadData("RMR_ItemCatalog");
+                if (catalog == null)
+                    return 0;
+                return catalog.GetInt("ObtainCount_" + item.GetType().Name);
+            }
+            catch
             { }
             return 0;
         }
@@ -3739,8 +3737,10 @@ namespace RogueLike_Mod_Reborn
         {
             try
             {
-                int count = Singleton<LogueSaveManager>.Instance.LoadData("RMR_ItemCatalog").GetInt("ObtainCount_" + item.GetType().Name);
-                return count;
+                SaveData catalog = Singleton<LogueSaveManager>.Instance.LoadData("RMR_ItemCatalog");
+                if (catalog == null)
+                    return 0;
+                return catalog.GetInt("ObtainCount_" + item.GetType().Name);
             }
             catch
             { }
@@ -3751,9 +3751,12 @@ namespace RogueLike_Mod_Reborn
         {
             try
             {
-                bool obtain = Singleton<LogueSaveManager>.Instance.LoadData("RMR_ItemCatalog").GetInt("ObtainCount_" + item.GetType().Name) > 0;
-                return obtain;
-            } catch
+                SaveData catalog = Singleton<LogueSaveManager>.Instance.LoadData("RMR_ItemCatalog");
+                if (catalog == null)
+                    return false;
+                return catalog.GetInt("ObtainCount_" + item.GetType().Name) > 0;
+            }
+            catch
             { }
             return false;
         }
@@ -3761,8 +3764,10 @@ namespace RogueLike_Mod_Reborn
         {
             try
             {
-                bool obtain = Singleton<LogueSaveManager>.Instance.LoadData("RMR_ItemCatalog").GetInt("ObtainCount_" + item.GetType().Name) > 0;
-                return obtain;
+                SaveData catalog = Singleton<LogueSaveManager>.Instance.LoadData("RMR_ItemCatalog");
+                if (catalog == null)
+                    return false;
+                return catalog.GetInt("ObtainCount_" + item.GetType().Name) > 0;
             }
             catch
             { }

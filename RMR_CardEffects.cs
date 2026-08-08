@@ -6240,6 +6240,7 @@ namespace RogueLike_Mod_Reborn
     /// </summary>
     public class DiceCardSelfAbility_RMR_kaliNormalAttackJ : DiceCardSelfAbilityBase
     {
+        private readonly int _activateLine = 8;
         private int _totalDamage;
 
         public override string[] Keywords => new string[] { "DrawCard_Keyword" };
@@ -6256,20 +6257,24 @@ namespace RogueLike_Mod_Reborn
 
         public override void OnEndBattle()
         {
-            if (_totalDamage < 8 || owner?.allyCardDetail == null || card?.card == null)
+            if (_totalDamage < _activateLine || owner?.allyCardDetail == null || card?.card == null)
                 return;
+            ActivateSameOriginCostCutAndDraw();
+        }
 
-            LorId usedOriginId = card.card.GetID()?.GetOriginalId();
-            if (usedOriginId == null || usedOriginId == LorId.None)
-                return;
-
-            foreach (BattleDiceCardModel other in owner.allyCardDetail.GetAllDeck())
+        private void ActivateSameOriginCostCutAndDraw()
+        {
+            int originNumericId = card.card.GetID()?.GetOriginalId()?.id ?? 0;
+            if (originNumericId != 0)
             {
-                if (other == null || other == card.card)
-                    continue;
-                LorId otherId = other.GetID();
-                if (otherId != null && otherId.GetOriginalId() == usedOriginId)
-                    other.AddCost(-1);
+                foreach (BattleDiceCardModel other in owner.allyCardDetail.GetAllDeck())
+                {
+                    if (other == null || other == card.card)
+                        continue;
+                    LorId otherId = other.GetID();
+                    if (otherId != null && otherId.GetOriginalId().id == originNumericId)
+                        other.AddCost(-1);
+                }
             }
             owner.allyCardDetail.DrawCards(1);
         }
@@ -6282,6 +6287,7 @@ namespace RogueLike_Mod_Reborn
     /// </summary>
     public class DiceCardSelfAbility_RMR_kaliNormalAttackZ : DiceCardSelfAbilityBase
     {
+        private readonly int _activateLine = 8;
         private int _totalDamage;
 
         public override string[] Keywords => new string[] { "DrawCard_Keyword" };
@@ -6298,20 +6304,24 @@ namespace RogueLike_Mod_Reborn
 
         public override void OnEndBattle()
         {
-            if (_totalDamage < 8 || owner?.allyCardDetail == null || card?.card == null)
+            if (_totalDamage < _activateLine || owner?.allyCardDetail == null || card?.card == null)
                 return;
+            ActivateSameOriginCostCutAndDraw();
+        }
 
-            LorId usedOriginId = card.card.GetID()?.GetOriginalId();
-            if (usedOriginId == null || usedOriginId == LorId.None)
-                return;
-
-            foreach (BattleDiceCardModel other in owner.allyCardDetail.GetAllDeck())
+        private void ActivateSameOriginCostCutAndDraw()
+        {
+            int originNumericId = card.card.GetID()?.GetOriginalId()?.id ?? 0;
+            if (originNumericId != 0)
             {
-                if (other == null || other == card.card)
-                    continue;
-                LorId otherId = other.GetID();
-                if (otherId != null && otherId.GetOriginalId() == usedOriginId)
-                    other.AddCost(-1);
+                foreach (BattleDiceCardModel other in owner.allyCardDetail.GetAllDeck())
+                {
+                    if (other == null || other == card.card)
+                        continue;
+                    LorId otherId = other.GetID();
+                    if (otherId != null && otherId.GetOriginalId().id == originNumericId)
+                        other.AddCost(-1);
+                }
             }
             owner.allyCardDetail.DrawCards(1);
         }
@@ -6324,6 +6334,7 @@ namespace RogueLike_Mod_Reborn
     /// </summary>
     public class DiceCardSelfAbility_RMR_kaliNormalAttackH : DiceCardSelfAbilityBase
     {
+        private readonly int _activateLine = 8;
         private int _totalDamage;
 
         public override string[] Keywords => new string[] { "Energy_Keyword" };
@@ -6340,20 +6351,24 @@ namespace RogueLike_Mod_Reborn
 
         public override void OnEndBattle()
         {
-            if (_totalDamage < 8 || owner?.allyCardDetail == null || card?.card == null)
+            if (_totalDamage < _activateLine || owner?.allyCardDetail == null || card?.card == null)
                 return;
+            ActivateSameOriginCostCutAndLight();
+        }
 
-            LorId usedOriginId = card.card.GetID()?.GetOriginalId();
-            if (usedOriginId == null || usedOriginId == LorId.None)
-                return;
-
-            foreach (BattleDiceCardModel other in owner.allyCardDetail.GetAllDeck())
+        private void ActivateSameOriginCostCutAndLight()
+        {
+            int originNumericId = card.card.GetID()?.GetOriginalId()?.id ?? 0;
+            if (originNumericId != 0)
             {
-                if (other == null || other == card.card)
-                    continue;
-                LorId otherId = other.GetID();
-                if (otherId != null && otherId.GetOriginalId() == usedOriginId)
-                    other.AddCost(-1);
+                foreach (BattleDiceCardModel other in owner.allyCardDetail.GetAllDeck())
+                {
+                    if (other == null || other == card.card)
+                        continue;
+                    LorId otherId = other.GetID();
+                    if (otherId != null && otherId.GetOriginalId().id == originNumericId)
+                        other.AddCost(-1);
+                }
             }
             owner.cardSlotDetail.RecoverPlayPointByCard(2);
         }

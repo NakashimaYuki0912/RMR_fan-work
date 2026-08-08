@@ -6,6 +6,7 @@
 using GameSave;
 using LOR_DiceSystem;
 using RogueLike_Mod_Reborn;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -154,39 +155,52 @@ namespace abcdcode_LOGLIKE_MOD
 
         public void ApplyUpgrade(MysteryModel_CardChoice mystery, MysteryModel_UpgradeCheckPopup popup, LorId cardid)
         {
-            if (!this.CanPurchase() || popup == null)
-                return;
-
-            if (popup.binahSpecialUpgrade || LogueBookModels.IsBinahDegradedUpgradeable(cardid))
+            try
             {
-                if (!LogueBookModels.TryApplyBinahDegradedCardUpgrade(cardid))
+                if (!this.CanPurchase() || popup == null)
                     return;
+
+                if (popup.binahSpecialUpgrade || LogueBookModels.IsBinahDegradedUpgradeable(cardid))
+                {
+                    if (!LogueBookModels.TryApplyBinahDegradedCardUpgrade(cardid))
+                        return;
+                    PassiveAbility_MoneyCheck.SubMoney(this.price);
+                    UISoundManager.instance.PlayEffectSound(UISoundType.Card_Apply);
+                    if (popup.slot != null)
+                        CardAddVfx.RunCardVfx(popup.slot);
+                    if (this.parent != null)
+                        this.parent.OnCardUpgradePurchased(this);
+                    if (!HasUpgradeableCards())
+                        this.gameObject.SetActive(false);
+                    return;
+                }
+
+                if (popup.metadata == null || string.IsNullOrEmpty(popup.metadata.unparsedPid))
+                {
+                    UIAlarmPopup.instance.SetAlarmText(TextDataModel.GetText("CardCheckPopUp_CannotUpgrade"));
+                    return;
+                }
+
+                LorId upgradedId = new LorId(popup.metadata.unparsedPid, cardid.id);
+                LogueBookModels.ReplaceUnlockedCardWithUpgrade(cardid, upgradedId);
+                LogueBookModels.SavePermanentCompendiumData();
+                try { LoguePlayDataSaver.SavePlayData_Menu(); }
+                catch (Exception ex) { Debug.LogWarning("[RMR] Save after card upgrade: " + ex.Message); }
                 PassiveAbility_MoneyCheck.SubMoney(this.price);
                 UISoundManager.instance.PlayEffectSound(UISoundType.Card_Apply);
-                CardAddVfx.RunCardVfx(popup.slot);
+                if (popup.slot != null)
+                    CardAddVfx.RunCardVfx(popup.slot);
                 if (this.parent != null)
                     this.parent.OnCardUpgradePurchased(this);
                 if (!HasUpgradeableCards())
                     this.gameObject.SetActive(false);
-                Singleton<MysteryManager>.Instance.EndMystery(mystery);
-                Singleton<MysteryManager>.Instance.EndMystery(popup);
-                return;
             }
-
-            if (popup.metadata == null)
-                return;
-            PassiveAbility_MoneyCheck.SubMoney(this.price);
-            LogueBookModels.DeleteCard(cardid);
-            LogueBookModels.AddCard(new LorId(popup.metadata.unparsedPid, cardid.id));
-            LogueBookModels.SavePermanentCompendiumData();
-            UISoundManager.instance.PlayEffectSound(UISoundType.Card_Apply);
-            CardAddVfx.RunCardVfx(popup.slot);
-            if (this.parent != null)
-                this.parent.OnCardUpgradePurchased(this);
-            if (!HasUpgradeableCards())
-                this.gameObject.SetActive(false);
-            Singleton<MysteryManager>.Instance.EndMystery(mystery);
-            Singleton<MysteryManager>.Instance.EndMystery(popup);
+            finally
+            {
+                // Always restore shop UI — failed upgrades used to leave CardChoice + popup stuck.
+                try { Singleton<MysteryManager>.Instance.EndMystery(mystery); } catch { /* best-effort */ }
+                try { Singleton<MysteryManager>.Instance.EndMystery(popup); } catch { /* best-effort */ }
+            }
         }
         #endregion
 

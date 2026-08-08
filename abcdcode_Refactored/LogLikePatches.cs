@@ -1419,11 +1419,49 @@ namespace abcdcode_LOGLIKE_MOD
                     return;
                 }
 
-                // Multi-phase Angela/Roland: Corrosion etc. keep boss immortal until final form.
-                // If EndBattle fires mid-phase (or during phase swap), do NOT clear floor / exit.
+                // Multi-phase Angela/Roland/Hokma: EndBattle can fire mid-wave.
+                // Hokma's EnemyTeamStageManager_HokmaFinal.IsStageFinishable stays false for most of
+                // the fight, so a bare "mid-phase → always orig()" used to:
+                //   - swallow real player wipes without OnRealizationBattleEnded cleanup, OR
+                //   - forward a spurious EndBattle and tear the reception down (sudden "실패").
+                // Branch by alive counts first.
                 if (RMRRealizationManager.IsMidRealizationMultiPhase())
                 {
-                    Debug.Log("[RMRRealizationManager] EndBattle during multi-phase transition — forward vanilla only, keep realization active.");
+                    int playersAlive = 0;
+                    int enemiesAlive = 0;
+                    try
+                    {
+                        playersAlive = BattleObjectManager.instance.GetAliveListWithAvailable(Faction.Player)?.Count ?? 0;
+                        enemiesAlive = BattleObjectManager.instance.GetAliveListWithAvailable(Faction.Enemy)?.Count ?? 0;
+                    }
+                    catch { /* treat as unknown → be conservative below */ }
+
+                    Debug.Log($"[RMRRealizationManager] Mid-phase EndBattle probe: floor={RMRRealizationManager.CurrentRealizationFloor} playersAlive={playersAlive} enemiesAlive={enemiesAlive}");
+
+                    // Real defeat: all librarians down — must run full realization cleanup.
+                    if (playersAlive <= 0)
+                    {
+                        Debug.Log("[RMRRealizationManager] Mid-phase EndBattle with no living librarians — treating as realization defeat.");
+                        RMRRealizationManager.OnRealizationBattleEnded(false);
+                        try { orig(self); }
+                        catch (Exception ex) { Debug.LogWarning("[RMR] Realization defeat EndBattle orig: " + ex.Message); }
+                        RMRRealizationManager.ClearRealizationFlag();
+                        RMRRealizationManager.ReturnToMainAfterRealization();
+                        RMRRealizationManager.EnsureExitBattleToLibrary();
+                        try { RMRSessionHygiene.OnNodeTransition(heavy: true); } catch { /* ignore */ }
+                        return;
+                    }
+
+                    // Spurious EndBattle while the fight is still contested — do NOT tear down.
+                    if (enemiesAlive > 0)
+                    {
+                        Debug.Log("[RMRRealizationManager] Ignoring spurious EndBattle mid-realization while both sides still have living units.");
+                        return;
+                    }
+
+                    // Players alive, enemies empty, stage not finishable → wave/phase transition.
+                    // Forward vanilla so Hokma/Angela can spawn the next form; keep realization active.
+                    Debug.Log("[RMRRealizationManager] EndBattle during multi-phase wave/phase transition — forward vanilla only, keep realization active.");
                     try { orig(self); }
                     catch (Exception ex) { Debug.LogWarning("[RMR] Mid-phase EndBattle orig: " + ex.Message); }
                     return;
@@ -1470,7 +1508,22 @@ namespace abcdcode_LOGLIKE_MOD
                 LogLikeMod.SetStagePhase(self, StageController.StagePhase.EndBattle);
             }
             else
+            {
+                // Already in EndBattle / EndBattlePhase. Vanilla EndBattle with no next wave
+                // is FinalEnd (舞台落幕). Ignore duplicates while rewards or next-stage pick
+                // are still pending (timed Sweeper wins used to Die→EndBattle twice).
+                try
+                {
+                    if (LogLikeMod.CheckStage(true)
+                        && RewardingModel.HasPendingPostBattleProgression())
+                    {
+                        Debug.Log("[RMR] Ignoring duplicate EndBattle - post-battle rewards/nextlist still pending.");
+                        return;
+                    }
+                }
+                catch { /* fall through to vanilla */ }
                 orig(self);
+            }
         }
 
         /// <summary>
@@ -1896,7 +1949,18 @@ namespace abcdcode_LOGLIKE_MOD
           EmotionCardXmlInfo card,
           BattleUnitModel target = null)
         {
-            var stage = Singleton<StagesXmlList>.Instance.GetStageInfo(new LorId(LogLikeMod.GetPickUpXmlWorkShopId_Stage(card), card.id));
+            var stageId = new LorId(LogLikeMod.GetPickUpXmlWorkShopId_Stage(card), card.id);
+            // Prefer the RemainStageList entry (keeps Rest vs Shop type) over GetStageInfo(id),
+            // which historically returned the first XML duplicate and poisoned Rest↔Shop.
+            LogueStageInfo stage = null;
+            if (LogueBookModels.RemainStageList != null
+                && LogueBookModels.RemainStageList.TryGetValue(LogLikeMod.curchaptergrade, out List<LogueStageInfo> remain)
+                && remain != null)
+            {
+                stage = remain.Find(s => s != null && s.Id == stageId);
+            }
+            if (stage == null)
+                stage = Singleton<StagesXmlList>.Instance.GetStageInfo(stageId);
             if (RewardingModel.rewardFlag == RewardingModel.RewardFlag.NextStageChoose && stage != null)
             {
                 if (stage.type == StageType.Creature)
@@ -1942,70 +2006,103 @@ namespace abcdcode_LOGLIKE_MOD
             }
             else if (Singleton<RewardPassivesList>.Instance.GetPassiveInfo(new LorId(LogLikeMod.GetPickUpXmlWorkShopId_Passive(card), card.id)) != null)
             {
-                RewardPassiveInfo pickedRewardInfo = Singleton<RewardPassivesList>.Instance.GetPassiveInfo(new LorId(LogLikeMod.GetPickUpXmlWorkShopId_Passive(card), card.id));
-                if (pickedRewardInfo == null)
+                // Never let catalog/save/apply exceptions abort LevelUpUI.OnClickTargetUnit —
+                // that leaves SelectOne open, allows multi-click apply, then softlocks.
+                try
                 {
-                    Debug.LogWarning("[StageLibraryFloorModel_OnPickPassiveCard] pickedRewardInfo is null, cannot process reward.");
-                    return;
-                }
-                if (pickedRewardInfo.rewardtype == RewardType.Creature && RewardingModel.rewardFlag == RewardingModel.RewardFlag.PassiveReward)
-                {
-                    RMRAbnormalityUnlockManager.OnEmotionPagePicked(card);
-                    LogLikeMod.rewards_passive.RemoveAt(0);
-                    return;
-                }
-                if (RewardingModel.rewardFlag == RewardingModel.RewardFlag.EmtoionChoose)
-                {
-                    RMRAbnormalityUnlockManager.OnEmotionPagePicked(card);
-                    if (RMRAbnormalityUnlockManager.IsNoAbnormalityFallback(card))
+                    RewardPassiveInfo pickedRewardInfo = Singleton<RewardPassivesList>.Instance.GetPassiveInfo(new LorId(LogLikeMod.GetPickUpXmlWorkShopId_Passive(card), card.id));
+                    if (pickedRewardInfo == null)
+                    {
+                        Debug.LogWarning("[StageLibraryFloorModel_OnPickPassiveCard] pickedRewardInfo is null, cannot process reward.");
                         return;
-                }
-                if (card.Script == null || card.Script.Count == 0)
-                {
-                    Debug.LogError("[StageLibraryFloorModel_OnPickPassiveCard] card.Script is null or empty, cannot resolve PickUp.");
-                    return;
-                }
-                PickUpModelBase pickUp = LogLikeMod.FindPickUp(card.Script[0]);
-                if (pickUp != null)
-                {
-                    pickUp.rewardinfo = pickedRewardInfo;
-                    pickUp.id = new LorId(LogLikeMod.GetPickUpXmlWorkShopId_Passive(card), card.id);
-                    if (card.TargetType == EmotionTargetType.All || card.TargetType == EmotionTargetType.AllIncludingEnemy)
+                    }
+                    if (pickedRewardInfo.rewardtype == RewardType.Creature && RewardingModel.rewardFlag == RewardingModel.RewardFlag.PassiveReward)
                     {
-                        foreach (BattleUnitModel model in BattleObjectManager.instance.GetList(Faction.Player))
+                        try { RMRAbnormalityUnlockManager.OnEmotionPagePicked(card); }
+                        catch (Exception unlockEx) { Debug.LogWarning("[RMR] OnEmotionPagePicked: " + unlockEx.Message); }
+                        try { LogLikeMod.rewards_passive.RemoveAt(0); } catch { /* empty queue */ }
+                        return;
+                    }
+                    if (RewardingModel.rewardFlag == RewardingModel.RewardFlag.EmtoionChoose)
+                    {
+                        try { RMRAbnormalityUnlockManager.OnEmotionPagePicked(card); }
+                        catch (Exception unlockEx) { Debug.LogWarning("[RMR] OnEmotionPagePicked: " + unlockEx.Message); }
+                        // Arm EGO only after abno choice is committed — opening-time arm raced
+                        // EmotionChoice and replaced abno UI with EGO (levels 4/5 never applied).
+                        try { RewardingModel.ArmMidBattleEgoAfterEmotionIfNeeded(); }
+                        catch (Exception armEx) { Debug.LogWarning("[RMR] ArmMidBattleEgo: " + armEx.Message); }
+                        Debug.Log($"[RMR] Emotion abno applied curemotion={LogLikeMod.curemotion} selectedCount={LogueBookModels.selectedEmotion?.Count ?? 0} name={card?.Name}");
+                        if (RMRAbnormalityUnlockManager.IsNoAbnormalityFallback(card))
+                            return;
+                    }
+                    if (card.Script == null || card.Script.Count == 0)
+                    {
+                        Debug.LogError("[StageLibraryFloorModel_OnPickPassiveCard] card.Script is null or empty, cannot resolve PickUp.");
+                    }
+                    else
+                    {
+                        PickUpModelBase pickUp = LogLikeMod.FindPickUp(card.Script[0]);
+                        if (pickUp != null)
                         {
-                            pickUp.OnPickUp(model);
-                            if (LogueBookModels.playersPick.ContainsKey(model.UnitData.unitData))
-                                LogueBookModels.playersPick[model.UnitData.unitData].Add(new LorId(LogLikeMod.GetPickUpXmlWorkShopId_Passive(card), card.id));
-                        }
-                        if (card.TargetType == EmotionTargetType.AllIncludingEnemy)
-                        {
-                            foreach (BattleUnitModel model in BattleObjectManager.instance.GetList(Faction.Enemy))
-                                pickUp.OnPickUp(model);
+                            pickUp.rewardinfo = pickedRewardInfo;
+                            pickUp.id = new LorId(LogLikeMod.GetPickUpXmlWorkShopId_Passive(card), card.id);
+                            // Mutually exclusive targeting — All must not also hit the SelectOne branch.
+                            if (card.TargetType == EmotionTargetType.All || card.TargetType == EmotionTargetType.AllIncludingEnemy)
+                            {
+                                foreach (BattleUnitModel model in BattleObjectManager.instance.GetList(Faction.Player))
+                                {
+                                    pickUp.OnPickUp(model);
+                                    if (LogueBookModels.playersPick.ContainsKey(model.UnitData.unitData))
+                                        LogueBookModels.playersPick[model.UnitData.unitData].Add(new LorId(LogLikeMod.GetPickUpXmlWorkShopId_Passive(card), card.id));
+                                }
+                                if (card.TargetType == EmotionTargetType.AllIncludingEnemy)
+                                {
+                                    foreach (BattleUnitModel model in BattleObjectManager.instance.GetList(Faction.Enemy))
+                                        pickUp.OnPickUp(model);
+                                }
+                            }
+                            else if (target != null)
+                            {
+                                pickUp.OnPickUp(target);
+                                if (LogueBookModels.playersPick.ContainsKey(target.UnitData.unitData))
+                                    LogueBookModels.playersPick[target.UnitData.unitData].Add(new LorId(LogLikeMod.GetPickUpXmlWorkShopId_Passive(card), card.id));
+                            }
+                            else if (card.TargetType == EmotionTargetType.SelectOne)
+                            {
+                                Debug.LogWarning("[RMR] SelectOne emotion page picked with null target — skipping per-unit apply.");
+                            }
+                            pickUp.OnPickUp();
+                            Singleton<LogueSaveManager>.Instance.AddToObtainCount(pickUp);
                         }
                     }
-                    if (target != null)
-                    {
-                        pickUp.OnPickUp(target);
-                        if (LogueBookModels.playersPick.ContainsKey(target.UnitData.unitData))
-                            LogueBookModels.playersPick[target.UnitData.unitData].Add(new LorId(LogLikeMod.GetPickUpXmlWorkShopId_Passive(card), card.id));
-                    }
-                    pickUp.OnPickUp();
-                    Singleton<LogueSaveManager>.Instance.AddToObtainCount(pickUp);
                 }
-                switch (RewardingModel.rewardFlag)
+                catch (Exception applyEx)
                 {
-                    case RewardingModel.RewardFlag.PassiveReward:
-                        LogLikeMod.rewards_passive.RemoveAt(0);
-                        break;
-                    case RewardingModel.RewardFlag.RewardInStage:
-                        LogLikeMod.rewards_InStage.RemoveAt(0);
-                        if (Singleton<ShopManager>.Instance.curshop != null && LogLikeMod.rewards_InStage.Count == 0)
-                            Singleton<ShopManager>.Instance.curshop.HideShop();
-                        if (Singleton<MysteryManager>.Instance.curMystery == null || !(Singleton<MysteryManager>.Instance.curMystery is MysteryModel_Rest))
+                    Debug.LogError("[RMR] OnPickPassiveCard apply failed (UI must still close): " + applyEx);
+                }
+
+                try
+                {
+                    switch (RewardingModel.rewardFlag)
+                    {
+                        case RewardingModel.RewardFlag.PassiveReward:
+                            if (LogLikeMod.rewards_passive != null && LogLikeMod.rewards_passive.Count > 0)
+                                LogLikeMod.rewards_passive.RemoveAt(0);
                             break;
-                        (Singleton<MysteryManager>.Instance.curMystery as MysteryModel_Rest).HideRest();
-                        break;
+                        case RewardingModel.RewardFlag.RewardInStage:
+                            if (LogLikeMod.rewards_InStage != null && LogLikeMod.rewards_InStage.Count > 0)
+                                LogLikeMod.rewards_InStage.RemoveAt(0);
+                            if (Singleton<ShopManager>.Instance.curshop != null && (LogLikeMod.rewards_InStage == null || LogLikeMod.rewards_InStage.Count == 0))
+                                Singleton<ShopManager>.Instance.curshop.HideShop();
+                            if (Singleton<MysteryManager>.Instance.curMystery == null || !(Singleton<MysteryManager>.Instance.curMystery is MysteryModel_Rest))
+                                break;
+                            (Singleton<MysteryManager>.Instance.curMystery as MysteryModel_Rest).HideRest();
+                            break;
+                    }
+                }
+                catch (Exception queueEx)
+                {
+                    Debug.LogWarning("[RMR] Reward queue advance after OnPickPassiveCard failed: " + queueEx.Message);
                 }
             }
             else
@@ -2060,36 +2157,25 @@ namespace abcdcode_LOGLIKE_MOD
                     if (LogLikeMod.CraftBtnFrame != null)
                         LogLikeMod.CraftBtnFrame.enabled = false;
                 }
-                if (LogLikeMod.RealizationBtn == null)
+                // Destroy leftover prepare Realization / Compendium buttons from older builds.
+                // Hub owns those entry points — do not recreate prepare-panel stubs.
+                if (LogLikeMod.RealizationBtn != null)
                 {
-                    Button fieldValue = LogLikeMod.GetFieldValue<Button>(self, "button_BattleCard");
-                    LogLikeMod.RealizationBtn = UnityEngine.Object.Instantiate<Button>(fieldValue, fieldValue.transform.parent);
-                    LogLikeMod.RealizationBtn.transform.localPosition = fieldValue.transform.localPosition + new Vector3(800f, 0.0f);
-                    Button.ButtonClickedEvent btnEvent = new Button.ButtonClickedEvent();
-                    btnEvent.AddListener((UnityAction)(() => LogLikeRoutines.OnClickRealization(self)));
-                    LogLikeMod.RealizationBtn.onClick = btnEvent;
-                    LogLikeRoutines.SafeGetButtonComponents(LogLikeMod.RealizationBtn, out UITextDataLoader txtLoader, out Image realizationFrame);
-                    if (txtLoader != null)
-                    {
-                        txtLoader.key = "ui_Realization";
-                        txtLoader.SetText();
-                    }
-                    LogLikeRoutines.ApplyRealizationButtonText(LogLikeMod.RealizationBtn);
-                    LogLikeMod.RealizationBtnFrame = realizationFrame;
-                    if (LogLikeMod.RealizationBtnFrame != null)
-                        LogLikeMod.RealizationBtnFrame.enabled = false;
+                    try { UnityEngine.Object.Destroy(LogLikeMod.RealizationBtn.gameObject); } catch { /* ignore */ }
+                    LogLikeMod.RealizationBtn = null;
+                    LogLikeMod.RealizationBtnFrame = null;
+                }
+                if (LogLikeMod.CompendiumBtn != null)
+                {
+                    try { UnityEngine.Object.Destroy(LogLikeMod.CompendiumBtn.gameObject); } catch { /* ignore */ }
+                    LogLikeMod.CompendiumBtn = null;
+                    LogLikeMod.CompendiumBtnFrame = null;
                 }
                 LogLikeMod.InvenBtn.gameObject.SetActive(true);
                 if (LogLikeMod.CreatureBtn != null)
                     LogLikeMod.CreatureBtn.gameObject.SetActive(false);
                 if (LogLikeMod.CraftBtn != null)
                     LogLikeMod.CraftBtn.gameObject.SetActive(true);
-                if (LogLikeMod.CompendiumBtn != null)
-                    LogLikeMod.CompendiumBtn.gameObject.SetActive(false);
-                LogLikeRoutines.ApplyRealizationButtonText(LogLikeMod.RealizationBtn);
-                // Realization entry is only on the start hub — keep prepare-panel button hidden.
-                if (LogLikeMod.RealizationBtn != null)
-                    LogLikeMod.RealizationBtn.gameObject.SetActive(false);
                 Singleton<GlobalLogueInventoryPanel>.Instance.SetActive(false);
                 Singleton<LogCreatureTabPanel>.Instance.SetActive(false);
                 Singleton<LogCraftPanel>.Instance.SetActive(false);
@@ -3082,9 +3168,15 @@ namespace abcdcode_LOGLIKE_MOD
         public static bool StageController_RoundStartPhase_System(StageController __instance)
         {
             // First combat round of a realization fight — allow EndBattle cleanup afterward.
-            // Also re-ensures multiphase passives every round (Angela/Roland E.G.O forms).
+            // RoundStartPhase_System is polled every FixedUpdate until done; only the first
+            // tick of each round may run multiphase ensure (Hokma apostle log storm otherwise).
             if (RMRRealizationManager.InRealizationBattle)
-                RMRRealizationManager.MarkRealizationCombatLive();
+            {
+                bool alreadyStarted = false;
+                try { alreadyStarted = LogLikeMod.GetFieldValue<bool>(__instance, "_bCalledRoundStart_system"); }
+                catch { alreadyStarted = false; }
+                RMRRealizationManager.MarkRealizationCombatLive(ensureMultiphaseThisCall: !alreadyStarted);
+            }
 
             // Mid-battle EGO suppress flag is only needed through the emotion RoundEnd → next round.
             // Non-combat node exit (shop/mystery leave) also ends once the next wave's RoundStart runs.
@@ -3095,6 +3187,13 @@ namespace abcdcode_LOGLIKE_MOD
             if (!LogLikeMod.GetFieldValue<bool>(__instance, "_bCalledRoundStart_system") && LogLikeMod.CheckStage())
                 Singleton<GlobalLogueEffectManager>.Instance.OnRoundStart(__instance);
             return true;
+        }
+
+        [HarmonyPostfix, HarmonyPatch(typeof(StageController), nameof(StageController.RoundEndPhase))]
+        public static void StageController_RoundEndPhase_RealizationMultiphase()
+        {
+            if (RMRRealizationManager.InRealizationBattle)
+                RMRRealizationManager.NotifyRealizationRoundEnded();
         }
 
         /// <summary>
@@ -5462,7 +5561,24 @@ namespace abcdcode_LOGLIKE_MOD
         {
             if (!LogLikeMod.CheckStage())
                 return;
-            LogLikeMod.GetFieldValue<Image>(__instance, "_artwork").sprite = LogLikeMod.ArtWorks[__instance.Card.Artwork];
+            // Match EmotionPassiveCardUI_SetSprites: only override when a real mod ArtWorks
+            // entry exists. Blind ArtWorks[key] assignment caches null and wipes the vanilla
+            // Resources.Load("Sprites/CreatureArtworks/...") sprite (wrong/blank abno icons).
+            try
+            {
+                EmotionCardXmlInfo card = __instance.Card;
+                if (card == null || string.IsNullOrEmpty(card.Artwork))
+                    return;
+                if (LogLikeMod.ArtWorks == null || !LogLikeMod.ArtWorks.ContainsKey(card.Artwork))
+                    return;
+                Sprite sprite = LogLikeMod.ArtWorks[card.Artwork];
+                if (sprite == null)
+                    return;
+                Image image = LogLikeMod.GetFieldValue<Image>(__instance, "_artwork");
+                if (image != null)
+                    image.sprite = sprite;
+            }
+            catch { /* keep vanilla sprite */ }
         }
 
 
@@ -6113,12 +6229,17 @@ namespace abcdcode_LOGLIKE_MOD
         [HarmonyPrefix, HarmonyPatch(typeof(StageController), nameof(StageController.GameOver))]
         public static void StageController_GameOver(ref bool iswin, ref bool isbackbutton)
         {
+            // isbackbutton = ESC / return title / give-up UI — must NOT delete Continue.
+            // Real defeats (!iswin && !isbackbutton) still invalidate Lastest.
             if (!iswin
                 && !RMRRealizationManager.RealizationCombatLive
                 && !RMRRealizationManager.InRealizationBattle
                 && LogLikeMod.CheckStage(true))
             {
-                LoguePlayDataSaver.MarkRunDefeated("StageController.GameOver");
+                if (isbackbutton)
+                    LoguePlayDataSaver.MarkRunAbortWithoutDefeat("StageController.GameOver isbackbutton");
+                else
+                    LoguePlayDataSaver.MarkRunDefeated("StageController.GameOver");
             }
 
             // Realization defeat goes through vanilla GameOver, NOT EndBattle, so the
@@ -6177,6 +6298,18 @@ namespace abcdcode_LOGLIKE_MOD
 
             if (!LogLikeMod.CheckStage(true) || Environment.StackTrace.Contains("UIBgScreenChangeAnim"))
                 return;
+
+            // ESC/title abort: do not overwrite pre-battle Lastest with mid-fight state,
+            // and do not treat torn-down combat as a party wipe.
+            if (LoguePlayDataSaver.ConsumeRunAbortWithoutDefeat())
+            {
+                LogLikeMod.AddPlayer = false;
+                LogLikeMod.RecoverPlayers = false;
+                LoguePlayDataSaver.RemoveFlashData();
+                Debug.Log("[RMR] ClearBattle: abort without defeat — preserved Lastest (skipped SavePlayData/wipe).");
+                return;
+            }
+
             if (!LogLikeMod.purpleexcept)
             {
                 if (LogLikeMod.AddPlayer)

@@ -27,6 +27,11 @@ namespace abcdcode_LOGLIKE_MOD
         /// <summary>Save format version. Mismatch → CheckPlayerData returns false.</summary>
         public static string version = "4.8";
         public static bool RunDefeatPending { get; private set; }
+        /// <summary>
+        /// ESC / return-to-title abort. Preserves Lastest; next ClearBattle must not
+        /// overwrite it with mid-fight HP/isDead or treat teardown as a party wipe.
+        /// </summary>
+        public static bool RunAbortWithoutDefeat { get; private set; }
 
         #region --- Debug / chapter bootstrap ---
 
@@ -104,15 +109,35 @@ namespace abcdcode_LOGLIKE_MOD
             // A fresh run is starting, so there is no longer a good snapshot to protect.
             LastLoadFailed = false;
             RunDefeatPending = false;
+            RunAbortWithoutDefeat = false;
             Singleton<LogueSaveManager>.Instance.RemoveData("Lastest");
         }
 
         public static void MarkRunDefeated(string reason)
         {
             RunDefeatPending = true;
+            RunAbortWithoutDefeat = false;
             LastLoadFailed = false;
             Singleton<LogueSaveManager>.Instance.RemoveData("Lastest");
             Debug.Log($"[RMR Save] Run defeated; Lastest removed and snapshot writes blocked ({reason}).");
+        }
+
+        /// <summary>
+        /// Player left via ESC / title / give-up UI (<c>isbackbutton</c>). Keep Lastest.
+        /// </summary>
+        public static void MarkRunAbortWithoutDefeat(string reason)
+        {
+            RunAbortWithoutDefeat = true;
+            Debug.Log($"[RMR Save] Run aborted without defeat; Lastest preserved ({reason}).");
+        }
+
+        /// <summary>Consume the abort latch once (ClearBattle). Returns true if abort was pending.</summary>
+        public static bool ConsumeRunAbortWithoutDefeat()
+        {
+            if (!RunAbortWithoutDefeat)
+                return false;
+            RunAbortWithoutDefeat = false;
+            return true;
         }
 
         /// <summary>

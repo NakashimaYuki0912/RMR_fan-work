@@ -38,5 +38,11 @@ Assert-Match $rewarding `
 Assert-Match $patches `
     'HideRewardSelectionImmediately[\s\S]*?cardSelectionGroup\.interactable\s*=\s*false[\s\S]*?egoSlotList[\s\S]*?SetActive\(false\)' `
     'Closing a mid-battle E.G.O. offer must disable interaction and deactivate its old card slots.'
+Assert-Match $patches `
+    'OnEmotionPagePicked\(card\)[\s\S]*?ArmMidBattleEgoAfterEmotionIfNeeded\(\)' `
+    'Mid-battle E.G.O. must arm only after the abnormality page is committed.'
+if ($rewarding -match 'public static void PickEmotion\([\s\S]*?ArmMidBattleEgoAfterEmotionIfNeeded\(\)[\s\S]*?ui_levelup\.Init') {
+    throw 'PickEmotion must not arm mid-battle E.G.O. at offer-open time (races EmotionChoice and skips abno 4/5).'
+}
 
 Write-Output 'PASS: mid-battle E.G.O. completion cannot leak the same input into the next abnormality-page choice.'

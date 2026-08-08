@@ -82,6 +82,17 @@ namespace abcdcode_LOGLIKE_MOD
             if (!this.binahSpecialUpgrade)
                 upgradeList.Sort((x, y) => UpgradeMetadata.UnpackPidUnsafe(x.id.packageId).index > UpgradeMetadata.UnpackPidUnsafe(y.id.packageId).index ? 1 : 0);
 
+            // No upgrade path: keep Cancel enabled, disable OK so the shop cannot softlock.
+            if (upgradeList.Count == 0 && !this.binahSpecialUpgrade)
+            {
+                button1.interactable = false;
+                try
+                {
+                    UIAlarmPopup.instance.SetAlarmText(TextDataModel.GetText("CardCheckPopUp_CannotUpgrade"));
+                }
+                catch { /* alarm optional */ }
+            }
+
             curcard.transform.SetParent(image.transform);
             curcard.transform.localScale = new Vector3(1.5f, 1.5f);
             curcard.transform.localPosition = new Vector3(upgradeList.Count > 1 ? 0f : -250f, upgradeList.Count > 1 ? 270f : 0.0f);
@@ -170,7 +181,18 @@ namespace abcdcode_LOGLIKE_MOD
 
         public void OnClickOk()
         {
-            CardAddVfx.RunCardVfx(slot);
+            if (!this.binahSpecialUpgrade && (this.metadata == null || this.slot == null))
+            {
+                try
+                {
+                    UIAlarmPopup.instance.SetAlarmText(TextDataModel.GetText("CardCheckPopUp_CannotUpgrade"));
+                }
+                catch { /* alarm optional */ }
+                this.DefaultNo();
+                return;
+            }
+            if (this.slot != null)
+                CardAddVfx.RunCardVfx(this.slot);
             if (this.okdele == null)
                 this.DefaultOk();
             else

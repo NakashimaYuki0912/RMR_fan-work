@@ -56,17 +56,27 @@ Assert-Match $rewarding 'RewardClearStage[\s\S]*?IsLiveCombatBothSidesAlive\(\)[
     'RewardClearStage must refuse live-combat termination.'
 Assert-Match $rewarding 'TryEndRunAfterAllRewards refused: combat is still live' `
     'Terminal reward cleanup must not end a still-live combat.'
-Assert-Match $patches 'IsMidRealizationMultiPhase\(\)[\s\S]*?keep realization active' `
-    'Realization EndBattle must preserve active multi-phase fights.'
+Assert-Match $patches 'IsMidRealizationMultiPhase\(\)[\s\S]*?playersAlive[\s\S]*?enemiesAlive[\s\S]*?Ignoring spurious EndBattle mid-realization[\s\S]*?keep realization active' `
+    'Realization EndBattle must branch: librarian wipe / ignore while contested / wave transition only.'
 Assert-Match $realization 'EnemyStageManager[\s\S]*?!mgr\.IsStageFinishable\(\)[\s\S]*?return true;' `
     'Realization phase detection must respect EnemyStageManager.IsStageFinishable.'
 
-# Event combats intentionally end after their scripted timer, but they still need
-# the sticky non-combat exit marker so the next-stage selection cannot leak back
-# into the residual event wave.
-Assert-Match $mysterySweeper 'MarkNonCombatNodeExit\("MysterySweeperTimer"\)' `
-    'Sweeper timed mystery exit must mark the intentional non-combat end.'
-Assert-Match $mysteryThreeRounds 'MarkNonCombatNodeExit\("MysteryThreeRoundTimer"\)' `
-    'Three-round mystery exit must mark the intentional non-combat end.'
+# Timed event combats (Sweeper / 3-round) must force a Normal-style victory without
+# the sticky NonCombatNodeExit flag — that flag skips battle-clear enqueue and can
+# race a duplicate EndBattle into vanilla FinalEnd before next-stage pick.
+Assert-Match $mysterySweeper 'MarkForcedTimedCombatVictory\("MysterySweeperTimer"\)' `
+    'Sweeper timed mystery exit must mark forced combat victory (not NonCombatNodeExit).'
+Assert-Match $mysteryThreeRounds 'MarkForcedTimedCombatVictory\("MysteryThreeRoundTimer"\)' `
+    'Three-round mystery exit must mark forced combat victory (not NonCombatNodeExit).'
+Assert-Match $mysterySweeper 'Phase != StageController\.StagePhase\.EndBattle' `
+    'Sweeper must not call EndBattle when already in EndBattlePhase.'
+Assert-Match $mysterySweeper '_ended' `
+    'Sweeper timed victory must latch so OnRoundStart cannot re-fire Wave.Defeat/EndBattle.'
+Assert-Match $rewarding 'MarkForcedTimedCombatVictory' `
+    'RewardingModel must expose MarkForcedTimedCombatVictory for timed event wins.'
+Assert-Match $rewarding 'HasPendingPostBattleProgression' `
+    'RewardingModel must expose HasPendingPostBattleProgression for duplicate EndBattle guard.'
+Assert-Match $patches 'Ignoring duplicate EndBattle - post-battle rewards/nextlist still pending' `
+    'StageController.EndBattle must ignore duplicates while rewards/nextlist are pending.'
 
 Write-Output 'PASS: battle-end paths distinguish real victory, phase transitions, and intentional event exits.'

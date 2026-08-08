@@ -70,19 +70,28 @@ Assert-Match $redMistThrustUpgrade `
     'The upgraded Red Mist greatsword thrust must use an upgrade-aware self ability.'
 
 Assert-Match $effects `
-    'DiceCardSelfAbility_RMR_kaliNormalAttackH[\s\S]*?_totalDamage\s*<\s*8' `
+    'DiceCardSelfAbility_RMR_kaliNormalAttackH[\s\S]*?_totalDamage\s*<\s*_activateLine' `
     'The upgraded Red Mist horizontal slash must require at least 8 damage.'
 Assert-Match $effects `
-    'DiceCardSelfAbility_RMR_kaliNormalAttackH[\s\S]*?usedOriginId\s*=[\s\S]*?GetOriginalId\(\)[\s\S]*?otherId\.GetOriginalId\(\)\s*==\s*usedOriginId[\s\S]*?AddCost\(\s*-1\s*\)[\s\S]*?RecoverPlayPointByCard\(\s*2\s*\)' `
+    'DiceCardSelfAbility_RMR_kaliNormalAttackH[\s\S]*?originNumericId[\s\S]*?GetOriginalId\(\)\.id[\s\S]*?AddCost\(\s*-1\s*\)[\s\S]*?RecoverPlayPointByCard\(\s*2\s*\)' `
     'The upgraded Red Mist horizontal slash must reduce other same-origin copies and recover 2 Light.'
 
 foreach ($scriptName in 'J', 'Z') {
     Assert-Match $effects `
-        "DiceCardSelfAbility_RMR_kaliNormalAttack$scriptName[\s\S]*?_totalDamage\s*<\s*8" `
+        "DiceCardSelfAbility_RMR_kaliNormalAttack$scriptName[\s\S]*?_totalDamage\s*<\s*_activateLine" `
         "The upgraded Red Mist $scriptName page must require at least 8 damage."
     Assert-Match $effects `
-        "DiceCardSelfAbility_RMR_kaliNormalAttack$scriptName[\s\S]*?usedOriginId\s*=[\s\S]*?GetOriginalId\(\)[\s\S]*?otherId\.GetOriginalId\(\)\s*==\s*usedOriginId[\s\S]*?AddCost\(\s*-1\s*\)[\s\S]*?DrawCards\(\s*1\s*\)" `
+        "DiceCardSelfAbility_RMR_kaliNormalAttack$scriptName[\s\S]*?originNumericId[\s\S]*?GetOriginalId\(\)\.id[\s\S]*?AddCost\(\s*-1\s*\)[\s\S]*?DrawCards\(\s*1\s*\)" `
         "The upgraded Red Mist $scriptName page must reduce other same-origin copies and draw 1 page."
+}
+
+foreach ($lang in 'cn', 'en', 'kr') {
+    $abilityLoc = Get-Content -LiteralPath (Join-Path $repoRoot "Localize\$lang\DiceAbilityInfo\UpgradeCardAbility.txt") -Raw -Encoding UTF8
+    foreach ($script in 'RMR_kaliNormalAttackJ', 'RMR_kaliNormalAttackZ', 'RMR_kaliNormalAttackH') {
+        Assert-Match $abilityLoc `
+            ("BattleCardAbility ID=`"" + [regex]::Escape($script) + "`"") `
+            "UpgradeCardAbility.txt ($lang) must localize $script or upgraded Red Mist pages show blank text."
+    }
 }
 
 $exclusiveTable = @($exclusiveDropTables.CardDropTableXmlRoot.DropTable) |

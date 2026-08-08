@@ -24,5 +24,11 @@ if ($text -notmatch 'AddCard\s*\(\s*RestoreSavedCombatCardForLoad\s*\(') {
 if ($text -notmatch 'LorId\s+cardId\s*=\s*RestoreSavedCombatCardForLoad\s*\(\s*ExtensionUtils\.LogLoadFromSaveData\s*\(\s*data8\s*\)\s*\)\s*;') {
     throw 'Continue librarian-deck loading does not rebuild dynamic upgraded IDs before AddCardFromInventory.'
 }
+if ($text -notmatch 'ReconcileDecksWithOwnedUpgrades\s*\(') {
+    throw 'Continue load must reconcile decks with owned upgrades after cardlist is restored.'
+}
+if ($text -notmatch 'NormalizeCardKey\s*\(\s*slot\.id\s*\)') {
+    throw 'Upgrade deck swap must match by NormalizeCardKey, not only exact LorId equality.'
+}
 
 'RMR UPGRADED CARD CONTINUE RESTORE STATIC CHECK PASSED'

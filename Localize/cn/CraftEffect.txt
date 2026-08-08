@@ -21,6 +21,8 @@
 	 <text id="CraftExCardChapter5Desc">制造1张随机的都市梦魇专属战斗书页(仅从当前拥有的都市梦魇级核心书页中随机选择并制作其专属书页)</text>
 	 <text id="CraftExCardChapter6Name">制造专属战斗书页 - 都市之星</text>
 	 <text id="CraftExCardChapter6Desc">制造1张随机的都市之星专属战斗书页(仅从当前拥有的都市之星级核心书页中随机选择并制作其专属书页)</text>
+	 <text id="CraftExCardChapter7Name">制造专属战斗书页 - 杂质</text>
+	 <text id="CraftExCardChapter7Desc">制造1张随机的杂质专属战斗书页(仅从当前拥有的杂质级核心书页中随机选择并制作其专属书页)</text>
 
 	 <text id="CraftEquipResult">已制造 {0}</text>
 </localize>

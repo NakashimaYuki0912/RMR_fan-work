@@ -106,4 +106,6 @@ Providing this information will make it much easier to identify and resolve the 
 
 Please contact me on Discord before beginning your derivative project.
 [/list]
-[h2]PS: This is a standalone version, so do not enable it alongside the original RMR mod.[/h2]
+[h2]Attention[/h2][list]
+[*]This is a standalone version, so do not enable it alongside the original RMR mod.
+[/list]

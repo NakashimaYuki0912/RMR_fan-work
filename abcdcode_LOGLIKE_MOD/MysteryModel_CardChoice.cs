@@ -82,8 +82,18 @@ namespace abcdcode_LOGLIKE_MOD
           MysteryModel_CardChoice.ChoiceResult dele,
           string desc)
         {
-            cardlist = new List<DiceCardItemModel>(cardlist);
-            cardlist.RemoveAll(x => x.num <= 0);
+            cardlist = new List<DiceCardItemModel>(cardlist ?? new List<DiceCardItemModel>());
+            cardlist.RemoveAll(x => x == null || x.num <= 0);
+            if (cardlist.Count == 0)
+            {
+                Debug.LogWarning("[RMR] PopupCardChoice: empty card list — refusing interrupt to avoid softlock.");
+                try
+                {
+                    UI.UIAlarmPopup.instance.SetAlarmText(TextDataModel.GetText("CardCheckPopUp_CannotUpgrade"));
+                }
+                catch { /* alarm optional */ }
+                return null;
+            }
             MysteryModel_CardChoice mystery = new MysteryModel_CardChoice();
             mystery.cardlist = cardlist;
             mystery.resultdel = dele;

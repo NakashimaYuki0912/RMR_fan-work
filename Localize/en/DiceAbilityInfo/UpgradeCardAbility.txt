@@ -1636,5 +1636,15 @@ Gain 4 Strength next Scene.
 Add a copy of ‘Pinpoint Breakthrough+’ to hand.</Desc>
   </BattleCardAbility>
 
+  <BattleCardAbility ID="RMR_kaliNormalAttackJ">
+    <Desc>If 8 or more damage was dealt with this page, draw 1 page and reduce the Cost of all other copies of the same page by 1</Desc>
+  </BattleCardAbility>
+  <BattleCardAbility ID="RMR_kaliNormalAttackZ">
+    <Desc>If 8 or more damage was dealt with this page, draw 1 page and reduce the Cost of all other copies of the same page by 1</Desc>
+  </BattleCardAbility>
+  <BattleCardAbility ID="RMR_kaliNormalAttackH">
+    <Desc>If 8 or more damage was dealt with this page, restore 2 Light and reduce the Cost of all other copies of the same page by 1</Desc>
+  </BattleCardAbility>
+
 </BattleCardAbilityDescRoot>
 

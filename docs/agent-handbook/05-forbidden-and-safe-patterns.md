@@ -16,7 +16,10 @@
 12. **在外层非 git 目录提交 / 改错树**  
 13. **git push 未得用户明确要求**  
 14. **批量无关格式化 / 大重构夹带修复**  
-15. **Unicode Emoji 当最终 UI 图标**（AGENTS 商店规则）
+15. **Unicode Emoji 当最终 UI 图标**（AGENTS 商店规则）  
+16. **对 `LogueSave/*` 目标文件直接 `File.Create` 再序列化** → 崩溃留下空/全 0 档 → 情感 SelectOne（如巨目）选完抛 `SerializationException` 软锁；必须走 `LogueSaveManager.SaveData`（先写 `.tmp` 再 `File.Replace`）  
+17. **在 `OnPickPassiveCard` / 选人收尾里让非关键副作用（图鉴统计、存档）抛出未捕获异常** → UI 关不掉、可连点多人；副作用必须 try/catch 或走已加固的 Save API  
+18. **`PickUpModel_RMRVanillaEmotion.OnPickUp()` 无参对全队生效** → SelectOne 叠双重/全队；无参必须空，只在 `OnPickUp(BattleUnitModel)` 施加
 
 ---
 

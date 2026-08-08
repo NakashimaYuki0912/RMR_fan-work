@@ -141,6 +141,7 @@ namespace RogueLike_Mod_Reborn
         {
             InRealizationBattle = false;
             RealizationCombatLive = false;
+            _multiphaseEnsuredThisRound = false;
         }
         #endregion
 
@@ -199,8 +200,16 @@ namespace RogueLike_Mod_Reborn
         #region --- Other helpers ---
 
 
+        /// <summary>Prevents EnsureRealizationMultiPhaseBossState from re-running every FixedUpdate
+        /// while RoundStartPhase_System is open (vanilla polls that phase each frame).</summary>
+        private static bool _multiphaseEnsuredThisRound;
+
         /// <summary>Call on first round start while in realization combat.</summary>
-        public static void MarkRealizationCombatLive()
+        /// <param name="ensureMultiphaseThisCall">
+        /// True only on the first RoundStartPhase tick of a round. False on subsequent
+        /// FixedUpdate polls of the same phase (avoids Hokma apostle log/CPU storms).
+        /// </param>
+        public static void MarkRealizationCombatLive(bool ensureMultiphaseThisCall = true)
         {
             if (!InRealizationBattle)
                 return;
@@ -211,9 +220,19 @@ namespace RogueLike_Mod_Reborn
                 // Vanilla Floor Realization pre-loads floor EGO; make sure the very first
                 // card-select round shows normal battle pages (EGO stays on the toggle).
                 try { RMRPrepareRestrictions.ForceHandUiToBattleCards(); } catch { }
+                _multiphaseEnsuredThisRound = false;
             }
-            // Every round: ensure multiphase boss passives + log immortal/phase state.
+
+            if (!ensureMultiphaseThisCall || _multiphaseEnsuredThisRound)
+                return;
+            _multiphaseEnsuredThisRound = true;
             EnsureRealizationMultiPhaseBossState();
+        }
+
+        /// <summary>Allow the next RoundStart to re-check multiphase boss passives.</summary>
+        public static void NotifyRealizationRoundEnded()
+        {
+            _multiphaseEnsuredThisRound = false;
         }
         #endregion
 
@@ -1158,15 +1177,18 @@ namespace RogueLike_Mod_Reborn
 
 
         /// <summary>
-        /// True while Angela/Roland multi-phase is still mid-fight (immortal boss not on final phase).
-        /// EndBattle during this window must not grant floor clear or exit to library.
+        /// True while Angela/Roland/Hokma multi-phase is still mid-fight (immortal boss not on final phase).
+        /// EndBattle during this window must not grant floor clear / exit — but MUST still distinguish
+        /// real librarian wipe vs spurious EndBattle vs wave transition (see StageController_EndBattle).
         /// </summary>
         public static bool IsMidRealizationMultiPhase()
         {
             try
             {
-                // ManagerScript floors (GeburaFinal, HodFinalBattle, BinahFinal, …):
-                // while !IsStageFinishable, phase transition is still in progress even if unit list is empty briefly.
+                // ManagerScript floors (GeburaFinal, HodFinalBattle, BinahFinal, HokmaFinal, …):
+                // while !IsStageFinishable, phase/wave transition may still be in progress even if
+                // the unit list is briefly empty. Callers MUST check player/enemy alive counts
+                // before deciding to ignore, forward, or treat as defeat.
                 try
                 {
                     var sc = Singleton<StageController>.Instance;
@@ -1209,13 +1231,10 @@ namespace RogueLike_Mod_Reborn
             if (unit == null)
                 return false;
 
-            // Vanilla IsImmortal() aggregates passiveDetail + bufListDetail.
-            try
-            {
-                if (unit.IsImmortal())
-                    return true;
-            }
-            catch { }
+            // Do NOT treat every immortal enemy as a multiphase Angela/Roland boss.
+            // Hokma apostles are intentionally immortal (PassiveAbility_905500) and MUST
+            // receive a real Die() from WhiteNightApostleDeadFilter after the clock filter;
+            // blocking that freezes wave/phase progression after ~12 apostle downs.
 
             // Phase passives (Malkuth 105010, Yesod 205010, …). Final phase enum value is 4.
             try
@@ -1302,7 +1321,9 @@ namespace RogueLike_Mod_Reborn
 
 
         /// <summary>
-        /// Called when combat goes live / each round: ensure multiphase passives exist and log state.
+        /// Called once per realization round: ensure Angela/Roland multiphase passives exist.
+        /// Must NOT run every FixedUpdate — Hokma has many immortal apostles and the old
+        /// per-enemy Debug.Log storm caused multi-second freezes / thermal CPU spikes.
         /// </summary>
         public static void EnsureRealizationMultiPhaseBossState()
         {
@@ -1317,10 +1338,13 @@ namespace RogueLike_Mod_Reborn
                 if (enemies == null)
                     return;
 
+                int scanned = 0;
+                int injected = 0;
                 foreach (BattleUnitModel unit in enemies)
                 {
                     if (unit == null || unit.IsDead())
                         continue;
+                    scanned++;
 
                     int bookId = 0;
                     try
@@ -1333,19 +1357,13 @@ namespace RogueLike_Mod_Reborn
                     catch { }
 
                     bool hasPhasePassive = false;
-                    bool immortal = false;
-                    int phase = -1;
-                    try { immortal = unit.IsImmortal(); } catch { }
-
                     foreach (object p in EnumeratePassives(unit))
                     {
                         if (p == null) continue;
                         if (!IsMultiphasePassiveType(p.GetType()))
                             continue;
                         hasPhasePassive = true;
-                        var phaseField = AccessTools.Field(p.GetType(), "_currentPhase");
-                        if (phaseField != null)
-                            phase = Convert.ToInt32(phaseField.GetValue(p));
+                        break;
                     }
 
                     if (!hasPhasePassive && bookId != 0
@@ -1353,8 +1371,7 @@ namespace RogueLike_Mod_Reborn
                     {
                         if (TryInjectMultiphasePassive(unit, passiveScript))
                         {
-                            hasPhasePassive = true;
-                            try { immortal = unit.IsImmortal(); } catch { }
+                            injected++;
                             Debug.Log($"[RMRRealizationManager] Injected multiphase passive {passiveScript} on book {bookId}");
                         }
                         else
@@ -1362,9 +1379,11 @@ namespace RogueLike_Mod_Reborn
                             Debug.LogWarning($"[RMRRealizationManager] Failed to inject multiphase passive {passiveScript} on book {bookId}");
                         }
                     }
-
-                    Debug.Log($"[RMRRealizationManager] Multiphase boss state: book={bookId} immortal={immortal} hasPhasePassive={hasPhasePassive} phase={phase} hp={unit.hp:F0}/{unit.MaxHp}");
                 }
+
+                // One summary line per round — never per-enemy (Hokma wave ≈ 4 apostles × every FixedUpdate was catastrophic).
+                if (injected > 0)
+                    Debug.Log($"[RMRRealizationManager] Multiphase ensure: floor={CurrentRealizationFloor} enemies={scanned} injected={injected}");
             }
             catch (Exception ex)
             {

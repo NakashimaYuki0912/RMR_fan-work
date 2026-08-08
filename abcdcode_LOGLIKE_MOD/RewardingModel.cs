@@ -1605,39 +1605,90 @@ namespace abcdcode_LOGLIKE_MOD
         /// <summary>
         /// Mark intentional non-combat node exit and strip residual enemy NPCs so
         /// IsLiveCombatBothSidesAlive is false for the remainder of EndBattlePhase.
+        /// Shop / mystery / rest only — do NOT use for timed combat victories
+        /// (Sweeper etc.): that sticky flag skips battle-clear enqueue and can race
+        /// a second EndBattle into vanilla FinalEnd (舞台落幕) before next-stage pick.
         /// </summary>
         public static void MarkNonCombatNodeExit(string reason = null)
         {
             NonCombatNodeExitPending = true;
+            ClearEnemyUnitsForExit(reason, "MarkNonCombatNodeExit");
+            if (!string.IsNullOrEmpty(reason))
+                Debug.Log("[RMR] NonCombatNodeExit pending: " + reason);
+        }
+
+        /// <summary>
+        /// Timed event combat win (survive N scenes): clear enemies so live-combat
+        /// guards pass and victory confirmation can enqueue Normal rewards + nextlist.
+        /// Does NOT set NonCombatNodeExitPending.
+        /// </summary>
+        public static void MarkForcedTimedCombatVictory(string reason = null)
+        {
+            // Ensure HasConfirmedBattleVictory sees a prior living-enemy observation.
+            SawLivingEnemyThisBattle = true;
+            ClearEnemyUnitsForExit(reason, "MarkForcedTimedCombatVictory");
+            if (!string.IsNullOrEmpty(reason))
+                Debug.Log("[RMR] ForcedTimedCombatVictory: " + reason);
+        }
+
+        private static void ClearEnemyUnitsForExit(string reason, string caller)
+        {
             try
             {
-                if (BattleObjectManager.instance != null)
+                if (BattleObjectManager.instance == null)
+                    return;
+                List<BattleUnitModel> enemies = BattleObjectManager.instance.GetList(Faction.Enemy);
+                if (enemies == null)
+                    return;
+                // Copy: Die may mutate the live unit list.
+                foreach (BattleUnitModel unit in new List<BattleUnitModel>(enemies))
                 {
-                    List<BattleUnitModel> enemies = BattleObjectManager.instance.GetList(Faction.Enemy);
-                    if (enemies != null)
-                    {
-                        // Copy: Die may mutate the live unit list.
-                        foreach (BattleUnitModel unit in new List<BattleUnitModel>(enemies))
-                        {
-                            if (unit == null || unit.IsDead())
-                                continue;
-                            try { unit.Die(); }
-                            catch { /* ignore immortal / already-dead */ }
-                        }
-                    }
+                    if (unit == null || unit.IsDead())
+                        continue;
+                    try { unit.Die(); }
+                    catch { /* ignore immortal / already-dead */ }
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[RMR] MarkNonCombatNodeExit clear enemies failed: " + ex.Message);
+                Debug.LogWarning("[RMR] " + caller + " clear enemies failed: " + ex.Message);
             }
-            if (!string.IsNullOrEmpty(reason))
-                Debug.Log("[RMR] NonCombatNodeExit pending: " + reason);
         }
 
         public static void ClearNonCombatNodeExit()
         {
             NonCombatNodeExitPending = false;
+        }
+
+        /// <summary>
+        /// True while post-battle reward / next-stage UI still has work. Used to ignore
+        /// duplicate EndBattle that would otherwise call vanilla FinalEnd (no next wave yet).
+        /// </summary>
+        public static bool HasPendingPostBattleProgression()
+        {
+            try
+            {
+                if (SingletonBehavior<BattleManagerUI>.Instance?.ui_levelup != null
+                    && SingletonBehavior<BattleManagerUI>.Instance.ui_levelup.IsEnabled)
+                    return true;
+            }
+            catch { /* UI tearing down */ }
+
+            try
+            {
+                if (Singleton<MysteryManager>.Instance?.curMystery != null)
+                    return true;
+            }
+            catch { /* ignore */ }
+
+            int rewardCount = LogLikeMod.rewards != null ? LogLikeMod.rewards.FindAll(x => x != null).Count : 0;
+            int passiveCount = LogLikeMod.rewards_passive != null ? LogLikeMod.rewards_passive.FindAll(x => x != null).Count : 0;
+            int nextCount = LogLikeMod.nextlist != null ? LogLikeMod.nextlist.FindAll(x => x != null).Count : 0;
+            if (rewardCount > 0 || passiveCount > 0 || nextCount > 0)
+                return true;
+            if (HasQueuedEgoSelections() || HasQueuedMysteryRewards())
+                return true;
+            return false;
         }
 
         /// <summary>True if a mid-battle EGO offer is pending (armed, not yet opened).</summary>
@@ -1692,7 +1743,8 @@ namespace abcdcode_LOGLIKE_MOD
 
         /// <summary>
         /// After an abnormality pick at emotion 3/4/5, arm a mid-battle EGO offer (opened next
-        /// EmotionChoice once LevelUpUI closes).
+        /// EmotionChoice once LevelUpUI closes). Must be called AFTER the abno pick completes —
+        /// never from PickEmotion/offer-open (see race with IsEnabled).
         /// </summary>
         public static void ArmMidBattleEgoAfterEmotionIfNeeded()
         {
@@ -1719,7 +1771,7 @@ namespace abcdcode_LOGLIKE_MOD
                 && (LogLikeMod.egoSelectionQueue == null || LogLikeMod.egoSelectionQueue.Count == 0))
                 return;
             _pendingMidBattleEgoEmotionLevel = lv;
-            Debug.Log($"[RMR] Armed mid-battle EGO selection after emotion abno pick level={lv}.");
+            Debug.Log($"[RMR] Armed mid-battle EGO selection after emotion abno pick level={lv} (selectedAbno={LogueBookModels.selectedEmotion?.Count ?? 0}).");
         }
 
         /// <summary>
@@ -1843,11 +1895,10 @@ namespace abcdcode_LOGLIKE_MOD
         public static void PickEmotion(List<EmotionCardXmlInfo> emotions)
         {
             RewardingModel.rewardFlag = RewardingModel.RewardFlag.EmtoionChoose;
-            // Vanilla: at team emotion 3/4/5, after abno pick comes floor E.G.O. selection.
-            ArmMidBattleEgoAfterEmotionIfNeeded();
-            // Font resolve only -- no scene sweep. This runs BEFORE ui_levelup.Init, so a sweep here
-            // would scan the previous screen's TMP and still miss the slots about to be built. The
-            // LevelUpUI.InitBase postfix repairs that panel after Init, scoped to the panel itself.
+            // Do NOT arm mid-battle EGO here. Arming at offer-open time races RoundEnd
+            // EmotionChoice: Init(abno) may leave IsEnabled false for a frame, then the next
+            // poll opens EGO and overwrites the abnormality UI (emotion 4/5 never apply —
+            // player ends at Emotion V with only 3 abno icons). Arm after the abno is picked.
             try { LogLikeMod.EnsureLocalizedFonts("PickEmotion", repairActiveUi: false); } catch { }
             SingletonBehavior<BattleManagerUI>.Instance.ui_levelup.Init(emotions.Count, emotions);
         }

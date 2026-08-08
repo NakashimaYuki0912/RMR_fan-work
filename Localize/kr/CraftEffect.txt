@@ -21,6 +21,8 @@
              <text id="CraftExCardChapter5Desc">무작위 도시악몽 전용 전투책장 1개를 생성 (인벤토리에 있는 핵심책장의 전용 책장만 선택, 잉여 전용 책장은 제작하지 않음)</text>
              <text id="CraftExCardChapter6Name">전용 전투책장 제작 - 도시의별</text>
              <text id="CraftExCardChapter6Desc">무작위 도시의별 전용 전투책장 1개를 생성 (인벤토리에 있는 핵심책장의 전용 책장만 선택, 잉여 전용 책장은 제작하지 않음)</text>
+             <text id="CraftExCardChapter7Name">전용 전투책장 제작 - 불순한 도시</text>
+             <text id="CraftExCardChapter7Desc">무작위 불순한 도시 전용 전투책장 1개를 생성 (인벤토리에 있는 핵심책장의 전용 책장만 선택, 잉여 전용 책장은 제작하지 않음)</text>
 
              <text id="CraftEquipResult">{0} 을(를) 제작했습니다.</text>
              <text id="CraftEquipCant">더이상 제작할 수 없습니다.</text>

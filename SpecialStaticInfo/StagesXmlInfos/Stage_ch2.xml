@@ -12,7 +12,7 @@
     <StageList ID="120001" StageType="Mystery" />
     <StageList ID="120002" StageType="Mystery" />
     <StageList ID="120003" StageType="Mystery" />
-    <StageList ID="112001" StageType="Rest" />
+    <StageList ID="112001" StageType="Shop" />
     <StageList ID="112001" StageType="Shop" /> 
   </ChapterList>
 

@@ -1327,5 +1327,15 @@ Otherwise 가함 20 피해 자신</Desc>
   <BattleCardAbility ID="RMR_whythefuckistherenoendurance1atk">
     <Desc>[적중] 얻음 인내 1 다음 막</Desc>
   </BattleCardAbility>
+
+  <BattleCardAbility ID="RMR_kaliNormalAttackJ">
+    <Desc>이 책장으로 피해를 8 이상 주면 책장을 1장 뽑고 다른 모든 동명 책장의 비용이 1 감소한다.</Desc>
+  </BattleCardAbility>
+  <BattleCardAbility ID="RMR_kaliNormalAttackZ">
+    <Desc>이 책장으로 피해를 8 이상 주면 책장을 1장 뽑고 다른 모든 동명 책장의 비용이 1 감소한다.</Desc>
+  </BattleCardAbility>
+  <BattleCardAbility ID="RMR_kaliNormalAttackH">
+    <Desc>이 책장으로 피해를 8 이상 주면 빛을 2 회복하고 다른 모든 동명 책장의 비용이 1 감소한다.</Desc>
+  </BattleCardAbility>
 </BattleCardAbilityDescRoot>
 

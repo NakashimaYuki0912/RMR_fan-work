@@ -12,7 +12,7 @@ namespace abcdcode_LOGLIKE_MOD
     {
         public override void OnClickChoice(int choiceid)
         {
-            MysteryBase.SetNextStageCustom(new LorId(LogLikeMod.ModId, 111001), StageType.Rest);
+            MysteryBase.SetNextStageCustom(new LorId(LogLikeMod.ModId, 855), StageType.Rest);
             base.OnClickChoice(choiceid);
         }
     }

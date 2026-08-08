@@ -21,6 +21,8 @@
 	 <text id="CraftExCardChapter5Desc">Craft a random Urban Nightmare exclusive Combat Page (Will not craft surplus exclusives, only picks exclusives from key pages available in inventory)</text>
 	 <text id="CraftExCardChapter6Name">Crafting Exclusive Combat Page - Star of the City</text>
 	 <text id="CraftExCardChapter6Desc">Craft a random Star of the City exclusive Combat Page (Will not craft surplus exclusives, only picks exclusives from key pages available in inventory)</text>
+	 <text id="CraftExCardChapter7Name">Crafting Exclusive Combat Page - Impuritas Civitatis</text>
+	 <text id="CraftExCardChapter7Desc">Craft a random Impuritas Civitatis exclusive Combat Page (Will not craft surplus exclusives, only picks exclusives from key pages available in inventory)</text>
 
 	 <text id="CraftEquipResult">Crafted {0}</text>
 </localize>

@@ -664,7 +664,7 @@ namespace abcdcode_LOGLIKE_MOD
             {
                 SaveData data3 = new SaveData();
                 foreach (LogueStageInfo logueStageInfo in remainStage.Value)
-                    data3.AddToList(logueStageInfo.Id.LogGetSaveData());
+                    data3.AddToList(LogueBookModels.SaveRemainStageEntry(logueStageInfo));
                 data2.AddData(remainStage.Key.ToString(), data3);
             }
             data1.AddData("RemainStageList", data2);
@@ -777,7 +777,7 @@ namespace abcdcode_LOGLIKE_MOD
             {
                 SaveData data4 = new SaveData();
                 foreach (LogueStageInfo logueStageInfo in remainStage.Value)
-                    data4.AddToList(logueStageInfo.Id.LogGetSaveData());
+                    data4.AddToList(LogueBookModels.SaveRemainStageEntry(logueStageInfo));
                 data3.AddData(remainStage.Key.ToString(), data4);
             }
             data1.AddData("RemainStageList", data3);
@@ -944,7 +944,7 @@ namespace abcdcode_LOGLIKE_MOD
                     List<LogueStageInfo> logueStageInfoList = new List<LogueStageInfo>();
                     foreach (SaveData data2 in data1.GetData(key.ToString()))
                     {
-                        LogueStageInfo stageInfo = Singleton<StagesXmlList>.Instance.GetStageInfo(ExtensionUtils.LogLoadFromSaveData(data2));
+                        LogueStageInfo stageInfo = LogueBookModels.LoadRemainStageEntry(data2);
                         if (stageInfo != null)
                         {
                             if (!string.IsNullOrEmpty(stageInfo.script))
@@ -1029,6 +1029,10 @@ namespace abcdcode_LOGLIKE_MOD
             PruneInvalidPermanentAbnormalityCompendiumUnlocks();
             RMRAbnormalityUnlockManager.LoadRouteUnlocks(save.GetData("RMRAbnormalityUnlocks"));
             LogueBookModels.nextinstanceid = save.GetInt("nextinstanceid");
+            // Decks load before cardlist. Old saves may still store base IDs in decks while
+            // inventory holds the upgraded type — reconcile so Continue does not force re-equip.
+            try { ReconcileDecksWithOwnedUpgrades(); }
+            catch (Exception ex) { Debug.LogWarning("[RMR Save] ReconcileDecksWithOwnedUpgrades: " + ex.Message); }
         }
 
         /// <summary>
@@ -1134,7 +1138,79 @@ namespace abcdcode_LOGLIKE_MOD
                     StageClassInfo stageClassInfo = stage == null ? null : StageClassInfoList.Instance.GetData(stage.Id);
                     return stageClassInfo == null || stageClassInfo.waveList == null || stageClassInfo.waveList.Count == 0;
                 });
+                foreach (LogueStageInfo stage in stages)
+                    RepairMisTypedShopRestNode(stage);
             }
+        }
+
+        /// <summary>
+        /// Persist RemainStageList entry with StageType (new). Old saves were LorId-only.
+        /// </summary>
+        private static SaveData SaveRemainStageEntry(LogueStageInfo stage)
+        {
+            SaveData entry = new SaveData();
+            if (stage == null)
+                return entry;
+            entry.AddData("id", stage.Id.LogGetSaveData());
+            entry.AddData("type", new SaveData((int)stage.type));
+            return entry;
+        }
+
+        /// <summary>
+        /// Load RemainStageList entry. Supports legacy LorId-only blobs and id+type records.
+        /// </summary>
+        private static LogueStageInfo LoadRemainStageEntry(SaveData data)
+        {
+            if (data == null)
+                return null;
+
+            LorId id;
+            StageType? savedType = null;
+            SaveData idData = data.GetData("id");
+            if (idData != null)
+            {
+                id = ExtensionUtils.LogLoadFromSaveData(idData);
+                try
+                {
+                    SaveData typeData = data.GetData("type");
+                    if (typeData != null)
+                        savedType = (StageType)typeData.GetIntSelf();
+                }
+                catch { /* type optional */ }
+            }
+            else
+            {
+                // Legacy: entry itself is a LorId save blob.
+                id = ExtensionUtils.LogLoadFromSaveData(data);
+            }
+
+            if (id == null)
+                return null;
+
+            LogueStageInfo stageInfo = savedType.HasValue
+                ? Singleton<StagesXmlList>.Instance.GetStageInfo(id, savedType)
+                : Singleton<StagesXmlList>.Instance.GetStageInfo(id);
+            if (stageInfo == null)
+                return null;
+            if (savedType.HasValue)
+                stageInfo.type = savedType.Value;
+            RepairMisTypedShopRestNode(stageInfo);
+            return stageInfo;
+        }
+
+        /// <summary>
+        /// 111001 / 112001 are shop stage assets. Rest nodes must use id 855.
+        /// Old ch1/ch2 XML listed Rest first for the same id, poisoning display vs content.
+        /// </summary>
+        private static void RepairMisTypedShopRestNode(LogueStageInfo stage)
+        {
+            if (stage == null || stage.type != StageType.Rest)
+                return;
+            int sid = stage.stageid;
+            if (sid != 111001 && sid != 112001 && sid != 113001)
+                return;
+            stage.type = StageType.Shop;
+            Debug.LogWarning($"[RMR] Repaired RemainStage Rest→Shop for shop stage id {sid}.");
         }
 
         public static void CreateStageDesc(LogueStageInfo info)
@@ -1983,6 +2059,189 @@ namespace abcdcode_LOGLIKE_MOD
                 while (inventory);
             }
             LogueBookModels.cardlist.Remove(diceCardItemModel);
+        }
+
+        /// <summary>
+        /// Shop/rest card upgrade: unlock the upgraded type, replace every deck copy of
+        /// <paramref name="oldId"/> with <paramref name="newId"/>, then drop the old type
+        /// from inventory without leaving decks empty.
+        /// </summary>
+        public static void ReplaceUnlockedCardWithUpgrade(LorId oldId, LorId newId)
+        {
+            if (oldId == null || newId == null)
+                return;
+            if (oldId == newId)
+            {
+                AddCard(newId);
+                return;
+            }
+
+            // Ensure dynamic <LogUpgrade> XML exists before GetCardItem (Continue / fresh process).
+            try
+            {
+                if (UpgradeMetadata.UnpackPid(newId.packageId, out UpgradeMetadata meta))
+                {
+                    DiceCardXmlInfo built = Singleton<LogCardUpgradeManager>.Instance.GetUpgradeCard(
+                        newId.GetOriginalId(), meta.index, meta.count);
+                    if (built?.id != null)
+                        newId = built.id;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR] ReplaceUnlockedCardWithUpgrade rebuild: " + ex.Message);
+            }
+
+            DiceCardXmlInfo upgradedXml = ItemXmlDataList.instance.GetCardItem(newId)
+                ?? ItemXmlDataList.instance.GetCardItem(newId, true);
+            if (upgradedXml == null)
+            {
+                Debug.LogError($"[RMR] ReplaceUnlockedCardWithUpgrade: upgraded card {newId} does not resolve.");
+                return;
+            }
+
+            AddCard(newId);
+
+            string oldKey = NormalizeCardKey(oldId);
+            int replacedSlots = 0;
+            foreach (UnitDataModel unit in EnumeratePlayerUnits())
+            {
+                if (unit?.bookItem == null)
+                    continue;
+                // Grade6 special fixed decks are projected via GetCardListFromCurrentDeck hook;
+                // still mutate the live _deck so saves and battle see the upgrade.
+                if (!TryGetActualCurrentDeck(unit.bookItem, out List<DiceCardXmlInfo> deck))
+                    continue;
+                for (int i = 0; i < deck.Count; i++)
+                {
+                    DiceCardXmlInfo slot = deck[i];
+                    if (slot == null || slot.id == null)
+                        continue;
+                    // Match by stable base key — exact LorId equality missed empty/@origin package variants.
+                    if (NormalizeCardKey(slot.id) != oldKey)
+                        continue;
+                    deck[i] = upgradedXml;
+                    replacedSlots++;
+                }
+            }
+            if (replacedSlots > 0)
+                Debug.Log($"[RMR] ReplaceUnlockedCardWithUpgrade: swapped {replacedSlots} deck slot(s) {oldId} → {newId}.");
+
+            // Remove every inventory entry of this card lineage (base or older upgrade), not only exact oldId.
+            if (LogueBookModels.cardlist != null)
+            {
+                LogueBookModels.cardlist.RemoveAll(x =>
+                    x != null && x.GetID() != null
+                    && NormalizeCardKey(x.GetID()) == oldKey
+                    && x.GetID() != newId
+                    && x.GetID() != upgradedXml.id);
+            }
+
+            if (IsUpgradedCardId(newId))
+                LogueBookModels.PurgeBaseCardsWhenUpgradeExists();
+        }
+
+        /// <summary>
+        /// After Continue loads decks (before cardlist) then inventory, swap any remaining
+        /// base / older-upgrade deck slots to the best owned upgraded definition.
+        /// </summary>
+        public static void ReconcileDecksWithOwnedUpgrades()
+        {
+            if (LogueBookModels.cardlist == null || LogueBookModels.cardlist.Count == 0)
+                return;
+
+            var bestByBase = new Dictionary<string, DiceCardXmlInfo>();
+            foreach (DiceCardItemModel item in LogueBookModels.cardlist)
+            {
+                if (item == null)
+                    continue;
+                LorId id = item.GetID();
+                if (id == null || !IsUpgradedCardId(id))
+                    continue;
+                DiceCardXmlInfo xml = ItemXmlDataList.instance.GetCardItem(id)
+                    ?? ItemXmlDataList.instance.GetCardItem(id, true);
+                if (xml == null)
+                {
+                    try
+                    {
+                        if (UpgradeMetadata.UnpackPid(id.packageId, out UpgradeMetadata meta))
+                            xml = Singleton<LogCardUpgradeManager>.Instance.GetUpgradeCard(
+                                id.GetOriginalId(), meta.index, meta.count);
+                    }
+                    catch { /* skip */ }
+                }
+                if (xml == null)
+                    continue;
+                string key = NormalizeCardKey(id);
+                if (!bestByBase.TryGetValue(key, out DiceCardXmlInfo existing)
+                    || GetUpgradeStackCount(xml.id) > GetUpgradeStackCount(existing.id))
+                {
+                    bestByBase[key] = xml;
+                }
+            }
+            if (bestByBase.Count == 0)
+                return;
+
+            int swapped = 0;
+            foreach (UnitDataModel unit in EnumeratePlayerUnits())
+            {
+                if (unit?.bookItem == null)
+                    continue;
+                if (!TryGetActualCurrentDeck(unit.bookItem, out List<DiceCardXmlInfo> deck))
+                    continue;
+                for (int i = 0; i < deck.Count; i++)
+                {
+                    DiceCardXmlInfo slot = deck[i];
+                    if (slot?.id == null)
+                        continue;
+                    string key = NormalizeCardKey(slot.id);
+                    if (!bestByBase.TryGetValue(key, out DiceCardXmlInfo upgraded))
+                        continue;
+                    if (slot.id == upgraded.id)
+                        continue;
+                    // Only promote base / lower-stack copies; never downgrade.
+                    if (IsUpgradedCardId(slot.id)
+                        && GetUpgradeStackCount(slot.id) >= GetUpgradeStackCount(upgraded.id))
+                        continue;
+                    deck[i] = upgraded;
+                    swapped++;
+                }
+            }
+            if (swapped > 0)
+                Debug.Log($"[RMR Save] ReconcileDecksWithOwnedUpgrades: promoted {swapped} deck slot(s) to owned upgrades.");
+        }
+
+        private static int GetUpgradeStackCount(LorId id)
+        {
+            try
+            {
+                if (id != null && UpgradeMetadata.UnpackPid(id.packageId, out UpgradeMetadata meta))
+                    return Math.Max(1, meta.count);
+            }
+            catch { /* ignore */ }
+            return 0;
+        }
+
+        private static IEnumerable<UnitDataModel> EnumeratePlayerUnits()
+        {
+            var seen = new HashSet<UnitDataModel>();
+            if (LogueBookModels.playerModel != null)
+            {
+                foreach (UnitDataModel unit in LogueBookModels.playerModel)
+                {
+                    if (unit != null && seen.Add(unit))
+                        yield return unit;
+                }
+            }
+            if (LogueBookModels.playerBattleModel != null)
+            {
+                foreach (UnitBattleDataModel battle in LogueBookModels.playerBattleModel)
+                {
+                    UnitDataModel unit = battle?.unitData;
+                    if (unit != null && seen.Add(unit))
+                        yield return unit;
+                }
+            }
         }
 
         // Check whether a card type is available in the unlocked inventory.

@@ -311,7 +311,13 @@ namespace RogueLike_Mod_Reborn
         }
         public override void OnPickUpShop(ShopGoods good)
         {
-            Singleton<GlobalLogueEffectManager>.Instance.AddEffects(new RMREffect_StasisBlaze());
+            var effect = new RMREffect_StasisBlaze();
+            var mgr = Singleton<GlobalLogueEffectManager>.Instance;
+            bool firstAcquire = mgr.GetEffect<RMREffect_StasisBlaze>() == null;
+            mgr.AddEffects(effect);
+            // AddEffects only calls AddedNew on duplicate stacks; first buy must open the seal UI.
+            if (firstAcquire && !mgr.isLoadingSave)
+                effect.AddedNew();
         }
 
         public override bool IsCanAddShop()
@@ -336,7 +342,13 @@ namespace RogueLike_Mod_Reborn
         }
         public override void OnPickUpShop(ShopGoods good)
         {
-            Singleton<GlobalLogueEffectManager>.Instance.AddEffects(new RMREffect_StasisSpark());
+            var effect = new RMREffect_StasisSpark();
+            var mgr = Singleton<GlobalLogueEffectManager>.Instance;
+            bool firstAcquire = mgr.GetEffect<RMREffect_StasisSpark>() == null;
+            mgr.AddEffects(effect);
+            // AddEffects only calls AddedNew on duplicate stacks; first buy must open the seal UI.
+            if (firstAcquire && !mgr.isLoadingSave)
+                effect.AddedNew();
         }
 
         public override bool IsCanAddShop()
@@ -361,7 +373,13 @@ namespace RogueLike_Mod_Reborn
         }
         public override void OnPickUpShop(ShopGoods good)
         {
-            Singleton<GlobalLogueEffectManager>.Instance.AddEffects(new RMREffect_StasisLight());
+            var effect = new RMREffect_StasisLight();
+            var mgr = Singleton<GlobalLogueEffectManager>.Instance;
+            bool firstAcquire = mgr.GetEffect<RMREffect_StasisLight>() == null;
+            mgr.AddEffects(effect);
+            // AddEffects only calls AddedNew on duplicate stacks; first buy must open the seal UI.
+            if (firstAcquire && !mgr.isLoadingSave)
+                effect.AddedNew();
         }
 
         public override bool IsCanAddShop()

@@ -65,21 +65,33 @@ namespace abcdcode_LOGLIKE_MOD
           MysteryModel_UpgradeCheckPopup mystery2,
           LorId cardid)
         {
-            if (mystery2 != null && (mystery2.binahSpecialUpgrade || LogueBookModels.IsBinahDegradedUpgradeable(cardid)))
+            try
             {
-                if (!LogueBookModels.TryApplyBinahDegradedCardUpgrade(cardid))
-                    return;
+                if (mystery2 != null && (mystery2.binahSpecialUpgrade || LogueBookModels.IsBinahDegradedUpgradeable(cardid)))
+                {
+                    if (!LogueBookModels.TryApplyBinahDegradedCardUpgrade(cardid))
+                        return;
+                }
+                else
+                {
+                    if (mystery2?.metadata == null || string.IsNullOrEmpty(mystery2.metadata.unparsedPid))
+                    {
+                        UI.UIAlarmPopup.instance.SetAlarmText(TextDataModel.GetText("CardCheckPopUp_CannotUpgrade"));
+                        return;
+                    }
+                    LogueBookModels.ReplaceUnlockedCardWithUpgrade(
+                        cardid,
+                        new LorId(mystery2.metadata.unparsedPid, cardid.id));
+                    try { LogueBookModels.SavePermanentCompendiumData(); } catch { /* atlas */ }
+                    try { LoguePlayDataSaver.SavePlayData_Menu(); } catch { /* continue snapshot */ }
+                }
+                UISoundManager.instance.PlayEffectSound(UISoundType.Card_Apply);
             }
-            else
+            finally
             {
-                if (mystery2?.metadata == null)
-                    return;
-                LogueBookModels.DeleteCard(cardid);
-                LogueBookModels.AddCard(new LorId(mystery2.metadata.unparsedPid, cardid.id));
+                try { Singleton<MysteryManager>.Instance.EndMystery(mystery); } catch { /* best-effort */ }
+                try { Singleton<MysteryManager>.Instance.EndMystery(mystery2); } catch { /* best-effort */ }
             }
-            UISoundManager.instance.PlayEffectSound(UISoundType.Card_Apply);
-            Singleton<MysteryManager>.Instance.EndMystery(mystery);
-            Singleton<MysteryManager>.Instance.EndMystery(mystery2);
         }
     }
 }

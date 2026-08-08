@@ -35,9 +35,12 @@ Assert-True ($gameOverStart -ge 0 -and $gameOverEnd -gt $gameOverStart) `
     "Could not isolate StageController_GameOver."
 $gameOverBody = $patches.Substring($gameOverStart, $gameOverEnd - $gameOverStart)
 $gameOverInvalidatesDefeat = $gameOverBody.Contains("!iswin") `
+    -and $gameOverBody.Contains("!isbackbutton") `
     -and $gameOverBody.Contains("LogLikeMod.CheckStage(true)") `
     -and $gameOverBody.Contains("MarkRunDefeated")
 Assert-True $gameOverInvalidatesDefeat `
-    "Vanilla GameOver defeat must invalidate the roguelike run even if ClearBattle is skipped."
+    "Vanilla GameOver defeat must invalidate the roguelike run even if ClearBattle is skipped (and must ignore isbackbutton aborts)."
+Assert-True ($gameOverBody.Contains("MarkRunAbortWithoutDefeat") -or $gameOverBody.Contains("isbackbutton")) `
+    "ESC / return-to-title (isbackbutton) must preserve Lastest instead of MarkRunDefeated."
 
 Write-Output "PASS: party wipe deletes Lastest, blocks rewrite, and cannot be continued."

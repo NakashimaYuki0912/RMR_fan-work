@@ -55,8 +55,11 @@ namespace abcdcode_LOGLIKE_MOD
 
         public override void OnPickUp()
         {
-            foreach (BattleUnitModel unit in BattleObjectManager.instance.GetAliveList(Faction.Player))
-                ApplyTo(unit);
+            // Intentionally empty. Per-librarian apply lives in OnPickUp(BattleUnitModel).
+            // StageLibraryFloorModel_OnPickPassiveCard always calls parameterless OnPickUp()
+            // AFTER the SelectOne/All targeted applies. The previous "apply to every ally"
+            // implementation stacked the same abnormality page twice on the chosen librarian
+            // (two 巨目/小喙 icons; Small Beak injected two 0-cost combat pages into hand).
         }
 
         public override void OnPickUp(BattleUnitModel model)

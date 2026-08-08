@@ -1780,11 +1780,14 @@ namespace abcdcode_LOGLIKE_MOD
                         Id = info.id,
                         Title = desc == null || string.IsNullOrEmpty(desc.cardName) ? info.script : desc.cardName,
                         Description = desc == null ? info.script : desc.abilityDesc,
-                        Artwork = info.Artwork,
+                        // Prefer vanilla Resources Sprites/CreatureArtworks/{Artwork} (same as EmotionPassiveCardUI).
+                        // info.Artwork only loads mod ArtWork/Creature_* CGs — often wrong reuse
+                        // (bossbird→Bigbird, snowwhite→QueenBee) and mismatches in-battle icons.
+                        Artwork = GetAbnormalityArtwork(info, card),
                         Unlocked = IsAbnormalityUnlocked(info),
                         Category = CompendiumCategory.AbnormalityPage,
                         Section = SectionFromTier(RMRAbnormalityUnlockManager.GetTierForScript(info.script)),
-                        Floor = GetFloorFromScript(info.script)
+                        Floor = RMRAbnormalityUnlockManager.GetFloorForScript(info.script)
                     };
                 }
             }
@@ -1945,6 +1948,56 @@ namespace abcdcode_LOGLIKE_MOD
             // UI key is card.Name after ApplyVanillaEmotionPresentation (e.g. SnowWhite_Vine).
             string key = !string.IsNullOrEmpty(card.Name) ? card.Name : card.Script[0];
             return Singleton<AbnormalityCardDescXmlList>.Instance.GetAbnormalityCard(key);
+        }
+
+        /// <summary>
+        /// Resolve abnormality page art the same way vanilla EmotionPassiveCardUI does:
+        /// Resources.Load("Sprites/CreatureArtworks/" + EmotionCardXmlInfo.Artwork).
+        /// Fall back to mod ArtWork PNGs only when the vanilla resource is missing.
+        /// </summary>
+        private static Sprite GetAbnormalityArtwork(RewardPassiveInfo info, EmotionCardXmlInfo card)
+        {
+            try
+            {
+                if (info != null && card != null)
+                    RMRAbnormalityUnlockManager.EnsureVanillaEmotionPresentation(info, card);
+            }
+            catch { /* ignore */ }
+
+            string vanillaKey = null;
+            try { vanillaKey = card != null ? card.Artwork : null; } catch { vanillaKey = null; }
+
+            if (!string.IsNullOrEmpty(vanillaKey))
+            {
+                try
+                {
+                    Sprite fromResources = Resources.Load<Sprite>("Sprites/CreatureArtworks/" + vanillaKey);
+                    if (fromResources != null)
+                        return fromResources;
+                }
+                catch { /* Resources may be unavailable outside play mode */ }
+
+                try
+                {
+                    if (LogLikeMod.ArtWorks != null && LogLikeMod.ArtWorks.ContainsKey(vanillaKey))
+                    {
+                        Sprite fromArtWorks = LogLikeMod.ArtWorks[vanillaKey];
+                        if (fromArtWorks != null)
+                            return fromArtWorks;
+                    }
+                }
+                catch { /* ignore */ }
+            }
+
+            try
+            {
+                Sprite modArt = info != null ? info.Artwork : null;
+                if (modArt != null)
+                    return modArt;
+            }
+            catch { /* ignore */ }
+
+            return null;
         }
 
         private static Sprite GetBookArtwork(BookXmlInfo info)
