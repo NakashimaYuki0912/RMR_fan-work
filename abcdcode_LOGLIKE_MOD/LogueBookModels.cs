@@ -904,6 +904,10 @@ namespace abcdcode_LOGLIKE_MOD
             {
                 KeyValuePair<string, SaveData> dic = keyValuePair;
                 UnitDataModel key = LogueBookModels.playerModel.Find(x => x.bookItem.BookId.id.ToString() == dic.Key);
+                if (key == null)
+                    continue;
+                if (!LogueBookModels.playersstatadders.ContainsKey(key))
+                    LogueBookModels.playersstatadders[key] = new List<LogStatAdder>();
                 foreach (SaveData saveData in dic.Value)
                 {
                     LogStatAdder statAdderBySave = LogStatAdder.CreateStatAdderBySave(saveData);
@@ -914,6 +918,9 @@ namespace abcdcode_LOGLIKE_MOD
                     }
                 }
             }
+            // Resist / HP adders mutate equipeffect only; load path SetOriginalResists wipes them.
+            try { LogueBookModels.ReapplyAllPlayerStatAdders(); }
+            catch (Exception reEx) { Debug.LogWarning("[RMR] ReapplyAllPlayerStatAdders after load: " + reEx.Message); }
             LogueBookModels.EmotionCardList = new List<RewardPassiveInfo>();
             try
             {
@@ -1242,8 +1249,28 @@ namespace abcdcode_LOGLIKE_MOD
             if (info.type == StageType.Boss)
             {
                 registeredPickUpXml._artwork = "Stage_Boss";
-                abnormalityCard.cardName = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText("Stage_Boss");
-                abnormalityCard.abilityDesc = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText("Stage_Boss_Desc");
+                int sid = info.Id != null ? info.Id.id : 0;
+                if (sid == 70020)
+                {
+                    string n = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText("Stage_Boss_BlackSilence");
+                    string d = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText("Stage_Boss_BlackSilence_Desc");
+                    abnormalityCard.cardName = (string.IsNullOrEmpty(n) || n == "Stage_Boss_BlackSilence") ? "Black Silence" : n;
+                    abnormalityCard.abilityDesc = (string.IsNullOrEmpty(d) || d == "Stage_Boss_BlackSilence_Desc")
+                        ? "Impuritas boss: The Black Silence (Roland)." : d;
+                }
+                else if (sid == 70021)
+                {
+                    string n = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText("Stage_Boss_DistortedEnsemble");
+                    string d = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText("Stage_Boss_DistortedEnsemble_Desc");
+                    abnormalityCard.cardName = (string.IsNullOrEmpty(n) || n == "Stage_Boss_DistortedEnsemble") ? "Distorted Ensemble" : n;
+                    abnormalityCard.abilityDesc = (string.IsNullOrEmpty(d) || d == "Stage_Boss_DistortedEnsemble_Desc")
+                        ? "Impuritas boss: Distorted Ensemble (Argalia)." : d;
+                }
+                else
+                {
+                    abnormalityCard.cardName = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText("Stage_Boss");
+                    abnormalityCard.abilityDesc = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText("Stage_Boss_Desc");
+                }
             }
             if (info.type == StageType.Mystery)
             {
@@ -2649,6 +2676,36 @@ namespace abcdcode_LOGLIKE_MOD
             }
         }
 
+        /// <summary>
+        /// Re-apply LogStatAdder effects (e.g. RestGood3 ResistAllUp) after load or battle create.
+        /// Adders only mutate runtime equipeffect; SetOriginalResists wipes them.
+        /// </summary>
+        public static void ReapplyAllPlayerStatAdders()
+        {
+            if (playersstatadders == null || playerBattleModel == null)
+                return;
+            foreach (KeyValuePair<UnitDataModel, List<LogStatAdder>> kv in playersstatadders.ToList())
+            {
+                if (kv.Key == null || kv.Value == null || kv.Value.Count == 0)
+                    continue;
+                UnitBattleDataModel battle = playerBattleModel.Find(x => x != null && x.unitData == kv.Key);
+                if (battle == null)
+                    continue;
+                try
+                {
+                    BookXmlInfo page = CurPlayerEquipInfo(kv.Key);
+                    if (page != null)
+                        EquipNewPage(battle, page, true);
+                    else
+                        ApplyPlayerStat(battle, kv.Value);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[RMR] ReapplyAllPlayerStatAdders unit failed: " + ex.Message);
+                }
+            }
+        }
+
         public static void ApplyPlayerStat(UnitBattleDataModel model, List<LogStatAdder> adder)
         {
             int hp = LogueBookModels.StatAdderManager.GetHp(adder);
@@ -3111,7 +3168,17 @@ namespace abcdcode_LOGLIKE_MOD
                 return new List<EmotionCardXmlInfo>();
             List<EmotionCardXmlInfo> nextList = new List<EmotionCardXmlInfo>();
             List<LogueStageInfo> logueStageInfoList = new List<LogueStageInfo>(collection);
-            if (logueStageInfoList.FindAll(x => x.type == StageType.Normal).Count > 1 || logueStageInfoList.Count > 5)
+            // Impuritas: do not offer Boss (70020/70021) until a few Normal steps this chapter.
+            if (grade >= ChapterGrade.Grade7 && LogLikeMod.curChStageStep < 3)
+            {
+                logueStageInfoList.RemoveAll(x => x != null && x.type == StageType.Boss);
+                if (logueStageInfoList.Count == 0)
+                    logueStageInfoList = new List<LogueStageInfo>(collection.FindAll(x => x != null && x.type != StageType.Boss));
+            }
+            // Pre-Impuritas: when many Normals remain, hide the single chapter Boss from early picks.
+            // Impuritas keeps both Black Silence / Ensemble bosses eligible once the step gate passes.
+            if (grade < ChapterGrade.Grade7
+                && (logueStageInfoList.FindAll(x => x.type == StageType.Normal).Count > 1 || logueStageInfoList.Count > 5))
             {
                 LogueStageInfo boss = logueStageInfoList.Find(x => x.type == StageType.Boss);
                 if (boss != null)

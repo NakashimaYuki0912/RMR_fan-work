@@ -77,7 +77,7 @@ namespace RogueLike_Mod_Reborn
         public const string packageId = "abcdcodecalmmagma.LogueLikeReborn";
         public static CustomMapHandler RMRMapHandler;
 
-        public const string BuildTimestamp = "2026-08-07Tupgrade-deck-reconcile+08:00";
+        public const string BuildTimestamp = "2026-08-14Thokma-sephirah-identity+08:00";
 
         #endregion
 

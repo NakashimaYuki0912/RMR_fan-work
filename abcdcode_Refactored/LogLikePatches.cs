@@ -884,16 +884,64 @@ namespace abcdcode_LOGLIKE_MOD
             SephirahType originalFloor = (SephirahType)ownerSephirahField.GetValue(unitData);
             SephirahType currentFloor = controller.CurrentFloor;
             bool rebound = originalFloor != currentFloor;
+            int result;
             try
             {
                 if (rebound)
                     ownerSephirahField.SetValue(unitData, currentFloor);
-                return orig(self, coinType, count);
+                result = orig(self, coinType, count);
             }
             finally
             {
                 if (rebound)
                     ownerSephirahField.SetValue(unitData, originalFloor);
+            }
+            // Vanilla only refills SpecialCardListModel cool when CanUsingEgo (emotion>=3 AND
+            // Library floor Level>=6). Realization / Compendium projections often fail the Level
+            // gate → floor EGO stays at 0 cool forever after one SpendCard.
+            EnsureFloorEgoCoolTimeProgressAfterVanilla(count);
+            return result;
+        }
+
+        /// <summary>
+        /// Apply floor-EGO cool on <see cref="SpecialCardListModel"/> for RMR coin paths.
+        /// Keeps the emotion-level &gt;= 3 gate (same as vanilla <c>CanUsingEgo</c> emotion half).
+        /// </summary>
+        private static void AddFloorEgoCoolTimeForRmr(int count)
+        {
+            if (count <= 0)
+                return;
+            try
+            {
+                EmotionBattleTeamModel team =
+                    Singleton<StageController>.Instance?.GetCurrentStageFloorModel()?.team;
+                if (team == null || team.emotionLevel < 3)
+                    return;
+                Singleton<SpecialCardListModel>.Instance?.AddEgoCoolTime(count);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR] AddFloorEgoCoolTimeForRmr: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// After vanilla <c>CreateEmotionCoin</c>: refill only when vanilla skipped
+        /// <see cref="SpecialCardListModel.AddEgoCoolTime"/> due to Library floor Level &lt; 6.
+        /// </summary>
+        private static void EnsureFloorEgoCoolTimeProgressAfterVanilla(int count)
+        {
+            try
+            {
+                EmotionBattleTeamModel team =
+                    Singleton<StageController>.Instance?.GetCurrentStageFloorModel()?.team;
+                if (team != null && team.CanUsingEgo())
+                    return;
+                AddFloorEgoCoolTimeForRmr(count);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR] EnsureFloorEgoCoolTimeProgressAfterVanilla: " + ex.Message);
             }
         }
 
@@ -912,7 +960,12 @@ namespace abcdcode_LOGLIKE_MOD
        count
             });
             if (battleUnitModel.faction == Faction.Player)
+            {
                 battleUnitModel.personalEgoDetail.AddEgoCoolTime(count);
+                // Replaces vanilla CreateEmotionCoin — always drive SpecialCardListModel cool
+                // (mid-battle picks register floor EGO there; personalEgo alone is not enough).
+                AddFloorEgoCoolTimeForRmr(count);
+            }
             if (self.EmotionLevel >= self.MaximumEmotionLevel)
                 return 0;
             List<EmotionCoin> emotionCoinList = (List<EmotionCoin>)BattleUnitEmotionDetailEmotionCoinsField.GetValue(self);
@@ -1350,7 +1403,11 @@ namespace abcdcode_LOGLIKE_MOD
                     Singleton<GlobalLogueEffectManager>.Instance.OnCreateLibrarian(defaultUnit);
             }
             if (applyLogueEffects)
+            {
                 Singleton<GlobalLogueEffectManager>.Instance.OnCreateLibrarians();
+                try { LogueBookModels.ReapplyAllPlayerStatAdders(); }
+                catch (Exception reEx) { Debug.LogWarning("[RMR] ReapplyAllPlayerStatAdders on create: " + reEx.Message); }
+            }
         }
 
         /// <summary>
@@ -1401,6 +1458,56 @@ namespace abcdcode_LOGLIKE_MOD
             }
             else
                 orig(self, data);
+        }
+
+        /// <summary>
+        /// Impurity Black Silence / Distorted Ensemble sit at 1 HP while ManagerScript ends the act.
+        /// The live-combat EndBattle swallow must not block that scripted ending.
+        /// </summary>
+        private static bool IsImpurityScriptedBossEndBattleAllowed(StageController self)
+        {
+            try
+            {
+                int stageId = LogLikeMod.curstageid != null ? LogLikeMod.curstageid.id : 0;
+                if (stageId == 70020 || stageId == 70021)
+                {
+                    Debug.Log($"[RMR] Allowing EndBattle for impurity/scripted boss ending (stage={LogLikeMod.curstageid})");
+                    return true;
+                }
+
+                EnemyTeamStageManager mgr = null;
+                try { mgr = self?.EnemyStageManager ?? Singleton<StageController>.Instance?.EnemyStageManager; }
+                catch { }
+                if (mgr != null)
+                {
+                    string typeName = mgr.GetType().Name ?? string.Empty;
+                    if (typeName.IndexOf("TwistedReverberationBand", StringComparison.OrdinalIgnoreCase) >= 0
+                        || typeName.IndexOf("BlackSilence", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        Debug.Log($"[RMR] Allowing EndBattle for impurity/scripted boss ending (mgr={typeName} stage={LogLikeMod.curstageid})");
+                        return true;
+                    }
+
+                    try
+                    {
+                        var field = AccessTools.Field(mgr.GetType(), "specialBattleEnding")
+                            ?? AccessTools.Field(mgr.GetType(), "_specialBattleEnding");
+                        var prop = AccessTools.Property(mgr.GetType(), "specialBattleEnding");
+                        object val = field != null ? field.GetValue(mgr) : prop?.GetValue(mgr, null);
+                        if (val is bool b && b)
+                        {
+                            Debug.Log($"[RMR] Allowing EndBattle for impurity/scripted boss ending (specialBattleEnding stage={LogLikeMod.curstageid})");
+                            return true;
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RMR] IsImpurityScriptedBossEndBattleAllowed: " + ex.Message);
+            }
+            return false;
         }
 
         /// <summary>
@@ -1492,11 +1599,14 @@ namespace abcdcode_LOGLIKE_MOD
                 // Spurious EndBattle while both factions still fight must not enter EndBattlePhase
                 // (seen after emotion-5 abno+EGO: field clears → looks like instant enemy wipe).
                 // Shop/mystery/rest and Purple Tear transition are excluded.
+                // Impurity scripted bosses (Black Silence / Distorted Ensemble) intentionally sit at
+                // 1 HP while ManagerScript requests EndBattle — do not swallow that.
                 try
                 {
                     if (!LogLikeMod.purpleexcept
                         && !RewardingModel.IsNonCombatNodeStage()
-                        && RewardingModel.IsLiveCombatBothSidesAlive())
+                        && RewardingModel.IsLiveCombatBothSidesAlive()
+                        && !IsImpurityScriptedBossEndBattleAllowed(self))
                     {
                         Debug.Log("[RMR] Ignoring EndBattle while both sides still alive (live combat).");
                         return;
@@ -3207,15 +3317,36 @@ namespace abcdcode_LOGLIKE_MOD
             BattleUnitModel attacker,
             bool callEvent)
         {
-            if (!RMRRealizationManager.ShouldBlockRealizationBossDeath(__instance))
+            bool block = RMRRealizationManager.ShouldBlockRealizationBossDeath(__instance);
+            try
+            {
+                bool probe = block;
+                if (!probe && RMRRealizationManager.InRealizationBattle && __instance != null
+                    && __instance.faction == Faction.Enemy
+                    && __instance.hp <= 1f)
+                    probe = true;
+                if (probe)
+                {
+                    int bid = 0;
+                    try { if (__instance?.Book != null) bid = __instance.Book.GetBookClassInfoId().id; } catch { }
+                    bool finishable = true;
+                    try
+                    {
+                        var mgr = Singleton<StageController>.Instance?.EnemyStageManager;
+                        if (mgr != null) finishable = mgr.IsStageFinishable();
+                    }
+                    catch { }
+                    Debug.Log($"[RMR DieProbe] block={block} book={bid} hp={__instance?.hp} floor={RMRRealizationManager.CurrentRealizationFloor} finishable={finishable}");
+                }
+            }
+            catch { /* probe only */ }
+
+            if (!block)
                 return true;
             try
             {
                 if (__instance.hp < 1f)
                     __instance.SetHp(1);
-                int bid = 0;
-                try { if (__instance.Book != null) bid = __instance.Book.GetBookClassInfoId().id; } catch { }
-                Debug.Log($"[RMRRealizationManager] Blocked Die on multiphase boss (hp clamped). book={bid}");
             }
             catch (Exception ex)
             {

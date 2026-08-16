@@ -115,7 +115,34 @@
 | 双方都活却进结算 | 情感 E.G.O. glitch | **已修** recovery |
 | SelectOne 异想体书页（巨目等）可选多人、全队生效后卡住 | `RMR_ItemCatalog` 坏档（`File.Create` 截断）→ `AddToObtainCount` 抛异常打断 `OnClickTargetUnit`；叠加无参 `OnPickUp` 全队 | **已修** 原子 `SaveData` + Load 隔离 + 选页 try/catch + 无参 OnPickUp 置空；静态检查 `RMR_0807_save_atomic_emotion_softlock_static_check.ps1` |
 | 宗教层解放战「打得好好的突然失败」 | Hokma 整场 `!IsStageFinishable` → 任意 `EndBattle` 都走「多阶段转发原版」；真实团灭未清理 / 误触发会直接拆场 | **已修** `StageController_EndBattle` 按存活人数分支：团灭=败北清理；双方都活=忽略；仅敌方空=波次转发 |
+| 白夜第三阶段全员混乱后被终结攻击团灭、没有获得「忏悔」 | 图鉴临时编队五人均为 `isSephirah=false`；原版白夜只给司书长 100 层保护并发放 `9909999` | **已修（待游戏内验）** 解放战索引 0/中间角色临时绑定当前楼层司书长身份，战后恢复路线身份；静态检查 `RMR_0814_realization_sephirah_identity_static_check.ps1` |
 | 情感 V 但只有 3 张异想体生效 | `PickEmotion` 打开异想体时就 Arm 中段 E.G.O.，`EmotionChoice` 下一轮在 `IsEnabled` 未就绪时用 E.G.O. 盖掉 4/5 异想体 | **已修** 改为异想体选完后再 `ArmMidBattleEgoAfterEmotionIfNeeded` |
+| Tiphereth / Hokma 解放战卡 1 HP、阶段不推进 | `IsMultiphasePassiveType` 过宽：凡 `_currentPhase` 即挡 Die（误伤 Despair `505211`）；使徒本应可 Die | **已修（待游戏内验）** Die 白名单仅 `105010`/`205010` + 使徒 never-block；探针 `[RMR DieProbe]` |
+| 杂质 Ensemble Argalia 卡 1 HP 战不结束 | CheckStage `IsLiveCombatBothSidesAlive` 吞掉 ManagerScript 的 EndBattle | **已修（待游戏内验）** `70020`/`70021` / TwistedReverberationBand / BlackSilence / `specialBattleEnding` 放行 |
+| Desiccant（8570029）杂质战斗无效 | ResistAllUp 只写 `equipeffect`；读档/`SetOriginalResists` 后未重应用 | **已修（待游戏内验）** `ReapplyAllPlayerStatAdders` 于续玩加载与开战 CreateLibrarian |
+| 解放/中段楼层 EGO 用一次后永久 CD | `CanUsingEgo` 要求楼层 Level≥6；`CreateRmrEmotionCoins` 不刷 `SpecialCardListModel` | **已修（待游戏内验）** `AddFloorEgoCoolTimeForRmr` / `EnsureFloorEgoCoolTimeProgressAfterVanilla` |
+| 杂质双 Boss 看起来像随机 / 标签不清 | `70020`+`70021` 同池；早期也可能抽到 Boss；UI 统称 Boss | **已修** `curChStageStep<3` 不给 Boss；节点名区分漆黑噤默 / 残响乐团 |
+| The Head 无法战斗 | Stage_ch7 无 Head 节点 | **Intended gap（暂不支持）** — 见下文 Impuritas 说明 |
+| Grade5（都市恶疾/梦魇）奖励池缺 1阶收尾人东焕之页 | `EquipReward_ch5.xml` 只列了同组 5 页中的 `243001-243004`（但丁/Seven协会3科/金笠/剑契成员），漏了 `243005`（东焕）；三语 Localize 均已有文本，纯遗漏 | **已修（Wave5）** 补 `<RewardList ID="243005" ... Rarity="Uncommon"/>`，走既有 `GetBookDataOriginAware` 通用 EquipPage 奖励路径，无需新代码 |
+
+### Impuritas / 解锁备注（2026-08-08）
+
+- **Head**：当前不支持，非半成品战。
+- **Olivier / Hana**：`Stage_ch7` 仅有 `70001–70010` Normal + 双 Boss；未单独加 Olivier/Hana 接待（避免无敌人 XML 的半接入）。
+- **Red Mist → Binah**：`UnlockBinahAfterRedMistVictory` + 帮助文案 intentional（殷红迷雾胜后记录 Binah）。
+- **Roland**：杂质 `70020` 首通记录漆黑噤默；帮助文案 intentional。
+- **Realization EGO 奖励池**：`GetUnlockedRealizationEgoCardsForRewards` 已按「已解放楼层 + 章节 tier + 未拥有」过滤；多楼层解放后池变大属设计，非无门控洪水。
+- **解放/中段楼层 EGO「用一次永久 CD」**：原版 `CreateEmotionCoin` 仅在 `CanUsingEgo()`（情感≥3 **且** Library 楼层 Level≥6）时给 `SpecialCardListModel.AddEgoCoolTime`；RMR 解放战/肉鸽楼层等级常 &lt;6，SpendCard 后 cool 停在 0、`CheckAddedEgoCard` 永不回手。另：`CreateRmrEmotionCoins` 原先只刷 `personalEgoDetail`，中段选进 `SpecialCardListModel` 的页也永不回冷。**已修** `AddFloorEgoCoolTimeForRmr` + `EnsureFloorEgoCoolTimeProgressAfterVanilla`；静态检查 `RMR_0808_floor_ego_cool_static_check.ps1`。
+
+### Wave5 复核（异想体/书页解锁与奖池，2026-08-08）
+
+独立复核确认以下均为**既有正确实现**，非 bug（未改动逻辑，仅记录证据，避免后续 agent 重新「修」一遍）：
+
+- **殷红迷雾胜利同时记录 Roland + Binah？** 否。`GrantRedMistChallengeVictoryRewards()`（`RMR_AbnormalityUnlocks.cs`）只授予殷红迷雾核心页 `250022` + 战斗页 `607003-607007` + `UnlockBinahAfterRedMistVictory()`；Roland（漆黑噤默）走完全独立的 `RecordBlackSilenceVictoryUnlock()`，只在 `BlackSilenceStageId=70020`（`Stage_ch7.xml`，Grade7）触发。两条路径互不覆盖，且帮助文案（`RMR_HelpHandbookPanel.cs` 183-190 行）明确写明殷红迷雾胜利解锁 Binah，属设计意图。
+- **都市之星（Grade6）入口门控是否正确？** 是。`EnsureGrade6SpecialCorePagesUnlocked()` 只在 `OnClearBossWave` 的 `case ChapterGrade.Grade6` 与 `LoguePlayDataSaver.LoadPlayData`（`curchaptergrade >= Grade6` 时）调用；Roland/苍蓝残响是「Grade7 首通后，未来跑到 Grade6 起就补发」的追溯型永久解锁（`IsBlackSilenceUnlockedForUrbanStar`/`IsDistortedEnsembleUnlockedForUrbanStar` 读永久 flag，与当前路线无关），Binah 则是「Grade6 内殷红迷雾本场临时可用 + 首通后当前路线永久」（`BinahUnlockedForCurrentRoute`）。两套门控没有互相污染或漏挡的迹象。
+- **Distorted Blade（Yan 专属战斗页 611001-611003）会不会混进普通掉落池？** 不会。全仓搜索确认它们只出现在 `AddData/CardDropTable/CardDropTable_exclusives.xml` 的 `-999999`（显式排除表，静态检查 `RMR_0729_special_unlock_and_redmist_upgrade_static_check.ps1` 保护）与 Yan 自己的 `EquipPage_Librarian_ch6.xml`/`Deck_enemy_ch6.xml`；`SpecialStaticInfo/RewardPassiveInfos/*` 与 `CardDropTable_ch6.xml`（都市之星奖励池）都不含这三个 ID。`LogueBookModels.GetCorePageExclusiveBattleCardIds()` 还会按角色书页 `EquipEffect.OnlyCard` 动态收集专属页并从存档/图鉴中裁剪，属通用防护，不是只硬编码 Yan 一人。
+
+平衡项清单：[`06-balance-backlog.md`](06-balance-backlog.md)。
 
 ---
 

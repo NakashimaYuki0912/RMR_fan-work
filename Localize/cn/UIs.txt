@@ -80,6 +80,8 @@
   <text id="Stage_Normal">普通战斗</text>
   <text id="Stage_Elite">精英战斗</text>
   <text id="Stage_Boss">Boss战斗</text>
+  <text id="Stage_Boss_BlackSilence">漆黑噤默</text>
+  <text id="Stage_Boss_DistortedEnsemble">扭曲残响乐团</text>
   <text id="Stage_Creature">异想体战斗</text>
   <text id="Stage_Mystery">随机事件</text>
   <text id="Stage_Shop">商店</text>
@@ -87,6 +89,8 @@
   <text id="Stage_Normal_Desc">接待一位普通来宾</text>
   <text id="Stage_Elite_Desc">接待一位强力来宾。战斗后获得1个被动能力。</text>
   <text id="Stage_Boss_Desc">接待一位超强的来宾。接待后继续下一章。</text>
+  <text id="Stage_Boss_BlackSilence_Desc">杂质 Boss：漆黑噤默（罗兰）。首次通关后记入图鉴，后续都市之星可自动获得。</text>
+  <text id="Stage_Boss_DistortedEnsemble_Desc">杂质 Boss：扭曲残响乐团（阿尔加利亚）。首次通关后记入图鉴，后续都市之星可自动获得。</text>
   <text id="Stage_Creature_Desc">挑战异想体战斗。战斗后获得异想体书页奖励。</text>
   <text id="Stage_Mystery_Desc">有什么事情发生了......</text>
   <text id="Stage_Shop_Desc">用你的积蓄购买有用的物品。</text>

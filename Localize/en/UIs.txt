@@ -77,6 +77,8 @@
   <text id="Stage_Normal">Normal Battle</text>
   <text id="Stage_Elite">Elite Battle</text>
   <text id="Stage_Boss">Boss Battle</text>
+  <text id="Stage_Boss_BlackSilence">Black Silence</text>
+  <text id="Stage_Boss_DistortedEnsemble">Distorted Ensemble</text>
   <text id="Stage_Creature">Abnormality Battle</text>
   <text id="Stage_Mystery">Random Event</text>
   <text id="Stage_Shop">Shop</text>
@@ -84,6 +86,8 @@
   <text id="Stage_Normal_Desc">Host an ordinary guest.</text>
   <text id="Stage_Elite_Desc">Host a strong guest. Gain 1 passive after battle.</text>
   <text id="Stage_Boss_Desc">Host a powerful guest. After this reception, continue to the next chapter.</text>
+  <text id="Stage_Boss_BlackSilence_Desc">Impuritas boss: The Black Silence (Roland). Clearing once records the page for future Star of the City runs.</text>
+  <text id="Stage_Boss_DistortedEnsemble_Desc">Impuritas boss: Distorted Ensemble (Argalia). Clearing once records Argalia for future Star of the City runs.</text>
   <text id="Stage_Creature_Desc">Fight an abnormality. Gain abnormality page rewards after battle.</text>
   <text id="Stage_Mystery_Desc">Something is about to happen...</text>
   <text id="Stage_Shop_Desc">Spend your savings on useful items.</text>

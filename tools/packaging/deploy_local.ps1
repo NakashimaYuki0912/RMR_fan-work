@@ -79,6 +79,21 @@ if (-not (Test-Path $builtDll)) {
     throw "Built DLL missing: $builtDll"
 }
 
+$stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$backupRoot = Join-Path $localModRoot "Assemblies\_codex_backups"
+$backupDir = Join-Path $backupRoot "deploy_$stamp"
+New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+
+function Backup-IfExists([string]$path) {
+    if (-not (Test-Path -LiteralPath $path)) {
+        return
+    }
+    $relativePath = $path.Substring($dllsRoot.Length).TrimStart('\', '/')
+    $destination = Join-Path $backupDir $relativePath
+    New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent) | Out-Null
+    Copy-Item -LiteralPath $path -Destination $destination -Force
+}
+
 function Copy-Tree([string]$src, [string]$dst) {
     if (-not (Test-Path $src)) {
         Write-Host "  skip missing: $src" -ForegroundColor Yellow
@@ -96,6 +111,9 @@ function Copy-Tree([string]$src, [string]$dst) {
 Write-Host "Deploy target LOCAL TEST mod:" -ForegroundColor Cyan
 Write-Host "  $localModRoot" -ForegroundColor DarkCyan
 New-Item -ItemType Directory -Force -Path $dllsRoot | Out-Null
+
+Write-Host "Backing up previous runtime DLL..." -ForegroundColor Cyan
+Backup-IfExists (Join-Path $dllsRoot "RogueLike Mod Reborn.dll")
 
 Write-Host "Copying DLL..." -ForegroundColor Cyan
 Copy-Item $builtDll (Join-Path $dllsRoot "RogueLike Mod Reborn.dll") -Force
@@ -121,10 +139,14 @@ if ($srcHash -ne $dstHash) {
     throw "DLL hash mismatch after local copy! src=$srcHash dst=$dstHash"
 }
 
+$backupRootFull = [IO.Path]::GetFullPath($backupRoot).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
 $pollution = @(Get-ChildItem -LiteralPath $localModRoot -Recurse -File | Where-Object {
-    $_.Name -match '(?i)(\.bak|\.old|\.orig|\.tmp|~|\.pre_[^.]*)$' -or
-    $_.FullName -match '(?i)\\_codex_backups\\|\\\.git\\' -or
-    $_.Extension -eq '.pdb'
+    $insideBackup = $_.FullName.StartsWith($backupRootFull, [StringComparison]::OrdinalIgnoreCase)
+    -not $insideBackup -and (
+        $_.Name -match '(?i)(\.bak|\.old|\.orig|\.tmp|~|\.pre_[^.]*)$' -or
+        $_.FullName -match '(?i)\\\.git\\' -or
+        $_.Extension -eq '.pdb'
+    )
 })
 if ($pollution.Count -gt 0) {
     throw "Local deployment contains excluded backup/debug files: $($pollution.FullName -join '; ')"
@@ -153,5 +175,6 @@ Write-Host "  List entry: [LOCAL TEST] RMR REBORN fan work"
 Write-Host "  Path: $localModRoot"
 Write-Host "  DLL SHA256: $dstHash"
 Write-Host "  Build stamp (from DLL metadata): $build"
+Write-Host "  Backup: $backupDir"
 Write-Host "  IMPORTANT: if the Workshop RMR item is also listed, activate only one RMR entry at a time."
 Write-Host "  Next: restart Library of Ruina and confirm Player.log Build: line matches."

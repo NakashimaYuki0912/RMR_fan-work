@@ -737,6 +737,8 @@ namespace RogueLike_Mod_Reborn
             public List<int> EquippedPassiveBookInstanceIds;
             public List<SaveData> InheritedPassives;
             public string CustomName;
+            public bool IsSephirah;
+            public SephirahType OwnerSephirah;
         }
 
         private static List<UnitDeepState> RouteUnitDeepStates;
@@ -1235,8 +1237,11 @@ namespace RogueLike_Mod_Reborn
             // Hokma apostles are intentionally immortal (PassiveAbility_905500) and MUST
             // receive a real Die() from WhiteNightApostleDeadFilter after the clock filter;
             // blocking that freezes wave/phase progression after ~12 apostle downs.
+            if (IsHokmaApostleUnit(unit))
+                return false;
 
-            // Phase passives (Malkuth 105010, Yesod 205010, …). Final phase enum value is 4.
+            // Phase passives (Malkuth 105010, Yesod 205010 only — real Angela CreaturePhase forms).
+            // Final CreaturePhase enum value is 4. Do NOT match Despair 505211 (_currentPhase without CreaturePhase).
             try
             {
                 foreach (object p in EnumeratePassives(unit))
@@ -1452,32 +1457,38 @@ namespace RogueLike_Mod_Reborn
             }
         }
 
+        /// <summary>
+        /// True for Hokma WhiteNight apostles — Die must never be Harmony-blocked.
+        /// </summary>
+        private static bool IsHokmaApostleUnit(BattleUnitModel unit)
+        {
+            if (unit == null)
+                return false;
+            try
+            {
+                foreach (object p in EnumeratePassives(unit))
+                {
+                    if (p == null) continue;
+                    string n = p.GetType().Name;
+                    if (n == "PassiveAbility_905500" || n == "PassiveAbility_905501"
+                        || n == "PassiveAbility_905502" || n == "PassiveAbility_905503")
+                        return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// Allowlist only real Angela multiphase CreaturePhase passives that exist in vanilla.
+        /// Broad _currentPhase heuristics falsely matched Knight-of-Despair (505211) and froze Tip/Hokma.
+        /// </summary>
         private static bool IsMultiphasePassiveType(Type t)
         {
             if (t == null)
                 return false;
             string n = t.Name;
-            // Known ids + any passive that owns CreaturePhase / _currentPhase multiphase field.
-            if (n == "PassiveAbility_105010" || n == "PassiveAbility_205010"
-                || n == "PassiveAbility_305010" || n == "PassiveAbility_405010"
-                || n == "PassiveAbility_505010" || n == "PassiveAbility_605010"
-                || n == "PassiveAbility_705010" || n == "PassiveAbility_805010"
-                || n == "PassiveAbility_905010")
-                return true;
-            if (AccessTools.Field(t, "_currentPhase") != null
-                && (n.StartsWith("PassiveAbility_1") || n.StartsWith("PassiveAbility_2")
-                    || n.StartsWith("PassiveAbility_3") || n.StartsWith("PassiveAbility_4")
-                    || n.StartsWith("PassiveAbility_5") || n.StartsWith("PassiveAbility_6")
-                    || n.StartsWith("PassiveAbility_7") || n.StartsWith("PassiveAbility_8")
-                    || n.StartsWith("PassiveAbility_9") || n.StartsWith("PassiveAbility_10")))
-                return true;
-            // Nested CreaturePhase enum is a strong signal (Malkuth/Yesod style).
-            foreach (Type nested in t.GetNestedTypes(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic))
-            {
-                if (nested.Name == "CreaturePhase")
-                    return true;
-            }
-            return false;
+            return n == "PassiveAbility_105010" || n == "PassiveAbility_205010";
         }
 
         private static IEnumerable<object> EnumeratePassives(BattleUnitModel unit)
@@ -1766,6 +1777,8 @@ namespace RogueLike_Mod_Reborn
                                 ds.InheritedPassives.Add(passive.GetSaveDataPassiveModel());
                         }
                         ds.CustomName = unit.name;
+                        ds.IsSephirah = unit.isSephirah;
+                        ds.OwnerSephirah = unit.OwnerSephirah;
                     }
                     RouteUnitDeepStates.Add(ds);
                 }
@@ -1886,6 +1899,23 @@ namespace RogueLike_Mod_Reborn
             }
 
             CompendiumOnlyLoadoutActive = true;
+            try
+            {
+                // Assign only after the temporary books/decks are ready. The battle models keep
+                // the same UnitDataModel references, while a failure here can still restore the
+                // route snapshot instead of leaking the temporary Sephirah identity.
+                AssignRealizationLibrarianIdentities(teamList);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[RMRRealizationManager] Failed to assign realization librarian identities: " + ex);
+                try { RestoreRouteLoadout(); }
+                catch (Exception restoreEx)
+                {
+                    Debug.LogError("[RMRRealizationManager] Identity assignment rollback failed: " + restoreEx);
+                }
+                return false;
+            }
 
             // Safety net: route snapshot / EquipNewPage may still leave EGO pages inside
             // current decks (e.g. atlas-recorded EGO ids). Move them back to inventory so
@@ -1895,6 +1925,44 @@ namespace RogueLike_Mod_Reborn
 
             Debug.Log($"[RMRRealizationManager] Applied atlas-only loadout: books={atlasBooks.Count}, cards={atlasCards.Count}, librarians={teamList.Count}");
             return true;
+        }
+
+        /// <summary>
+        /// Vanilla Floor Realizations reserve roster index 0 (the center formation slot) for
+        /// the floor's Sephirah. Several scripts depend on this identity instead of position;
+        /// WhiteNight gives Protection and Confess only to the unit whose isSephirah is true.
+        /// </summary>
+        private static void AssignRealizationLibrarianIdentities(List<UnitDataModel> teamList)
+        {
+            if (teamList == null || teamList.Count == 0)
+                throw new InvalidOperationException("Realization team has no librarian to assign as Sephirah.");
+
+            var ownerSephirahField = AccessTools.Field(typeof(UnitDataModel), "_ownerSephirah");
+            if (ownerSephirahField == null)
+                throw new MissingFieldException(typeof(UnitDataModel).FullName, "_ownerSephirah");
+
+            for (int i = 0; i < teamList.Count; i++)
+            {
+                UnitDataModel unit = teamList[i];
+                if (unit == null)
+                    continue;
+
+                unit.isSephirah = i == 0;
+                ownerSephirahField.SetValue(unit, CurrentRealizationFloor);
+                Debug.Log(
+                    $"[RMRRealizationManager] Realization librarian identity: index={i} " +
+                    $"isSephirah={unit.isSephirah} owner={unit.OwnerSephirah} floor={CurrentRealizationFloor}");
+            }
+        }
+
+        private static void RestoreUnitOwnerSephirah(UnitDataModel unit, SephirahType ownerSephirah)
+        {
+            if (unit == null)
+                return;
+            var ownerSephirahField = AccessTools.Field(typeof(UnitDataModel), "_ownerSephirah");
+            if (ownerSephirahField == null)
+                throw new MissingFieldException(typeof(UnitDataModel).FullName, "_ownerSephirah");
+            ownerSephirahField.SetValue(unit, ownerSephirah);
         }
 
         private static void RestoreRouteLoadout()
@@ -1928,6 +1996,11 @@ namespace RogueLike_Mod_Reborn
                     var ds = RouteUnitDeepStates[i];
                     if (unit == null || ds == null)
                         continue;
+                    // The realization temporarily makes roster index 0 the floor Sephirah.
+                    // Restore identity before EquipNewPage because vanilla equip restrictions
+                    // themselves inspect isSephirah and OwnerSephirah.
+                    unit.isSephirah = ds.IsSephirah;
+                    RestoreUnitOwnerSephirah(unit, ds.OwnerSephirah);
                     // Restore equipped book
                     if (ds.EquippedBookId != LorId.None && LogueBookModels.booklist != null)
                     {

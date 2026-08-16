@@ -77,7 +77,13 @@ $zipName = "RougelikeModReborn_v$timestamp.zip"
 $zipPath = Join-Path $archiveDir $zipName
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 
-Compress-Archive -Path "$tmpDir\*" -DestinationPath $zipPath -Force
+# Compress-Archive Write-Progress can throw IndexOutOfRange on large trees; use ZipFile.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::CreateFromDirectory(
+    $tmpDir,
+    $zipPath,
+    [System.IO.Compression.CompressionLevel]::Optimal,
+    $false)
 Remove-Item -Recurse -Force $tmpDir
 
 $zipSize = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)

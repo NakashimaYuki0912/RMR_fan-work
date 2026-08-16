@@ -111,6 +111,7 @@ namespace abcdcode_LOGLIKE_MOD
             RunDefeatPending = false;
             RunAbortWithoutDefeat = false;
             Singleton<LogueSaveManager>.Instance.RemoveData("Lastest");
+            Debug.Log("[RMR SaveLifecycle] RemovePlayerData Lastest wiped\n" + TruncateStack(Environment.StackTrace));
         }
 
         public static void MarkRunDefeated(string reason)
@@ -119,7 +120,7 @@ namespace abcdcode_LOGLIKE_MOD
             RunAbortWithoutDefeat = false;
             LastLoadFailed = false;
             Singleton<LogueSaveManager>.Instance.RemoveData("Lastest");
-            Debug.Log($"[RMR Save] Run defeated; Lastest removed and snapshot writes blocked ({reason}).");
+            Debug.Log($"[RMR SaveLifecycle] MarkRunDefeated ({reason})\n" + TruncateStack(Environment.StackTrace));
         }
 
         /// <summary>
@@ -128,7 +129,15 @@ namespace abcdcode_LOGLIKE_MOD
         public static void MarkRunAbortWithoutDefeat(string reason)
         {
             RunAbortWithoutDefeat = true;
-            Debug.Log($"[RMR Save] Run aborted without defeat; Lastest preserved ({reason}).");
+            Debug.Log($"[RMR SaveLifecycle] MarkRunAbortWithoutDefeat ({reason})\n" + TruncateStack(Environment.StackTrace));
+        }
+
+        private static string TruncateStack(string stack)
+        {
+            if (string.IsNullOrEmpty(stack))
+                return string.Empty;
+            const int max = 800;
+            return stack.Length <= max ? stack : stack.Substring(0, max) + "...";
         }
 
         /// <summary>Consume the abort latch once (ClearBattle). Returns true if abort was pending.</summary>
