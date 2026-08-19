@@ -196,12 +196,12 @@ namespace abcdcode_LOGLIKE_MOD
         {
             try
             {
-                string text = TextDataModel.GetText(key);
+                string text = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText(key);
                 if (!string.IsNullOrEmpty(text) && text != key)
                     return text;
             }
             catch { }
-            string lang = TextDataModel.CurrentLanguage.ToString().ToLowerInvariant();
+            string lang = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.CurrentLanguage.ToLowerInvariant();
             if (lang.Contains("en")) return en;
             if (lang.Contains("kr") || lang.Contains("ko")) return kr;
             if (lang.Contains("jp") || lang.Contains("ja")) return jp;
@@ -407,12 +407,12 @@ namespace abcdcode_LOGLIKE_MOD
         {
             try
             {
-                string text = TextDataModel.GetText(key);
+                string text = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.GetText(key);
                 if (!string.IsNullOrEmpty(text) && text != key)
                     return text;
             }
             catch { }
-            string lang = TextDataModel.CurrentLanguage.ToString().ToLowerInvariant();
+            string lang = abcdcode_LOGLIKE_MOD_Extension.TextDataModel.CurrentLanguage.ToLowerInvariant();
             if (lang.Contains("en")) return en;
             if (lang.Contains("kr") || lang.Contains("ko")) return kr;
             if (lang.Contains("jp") || lang.Contains("ja")) return jp;

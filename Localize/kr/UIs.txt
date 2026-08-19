@@ -37,10 +37,13 @@
   <text id="ui_RestShow">돌아가기</text>
   <text id="ui_Realization">층 개방전</text>
   <text id="ui_RMR_RealizationTitle">층 개방전</text>
+  <text id="ui_RMR_RealizationSubtitle">LIBRARY OF RUINA · FLOOR REALIZATION PASS</text>
   <text id="ui_RMR_RealizationDesc">층을 고른 뒤 편성하고, 원판 최종 층 개방전(안젤라/롤랑 다단계)에 도전합니다. 사전 환상체 진압은 없습니다. 첫 클리어 시 해당 층 책장이 영구 해금되며, 재전은 추가 보상이 없습니다.</text>
+  <text id="ui_RMR_RealizationProgress">해방 진행  {0} / {1}</text>
   <text id="ui_RMR_RealizationChallenge">도전</text>
   <text id="ui_RMR_RealizationCleared">완료</text>
   <text id="ui_RMR_RealizationReplay">완료 · 재전</text>
+  <text id="ui_RMR_RealizationFooter">Library of Ruina · Roguelike Mod Reborn</text>
   <text id="ui_RMR_RealizationClose">닫기</text>
   <text id="ui_RMR_HubTitle">로그라이크 시작</text>
   <text id="ui_RMR_HubDesc">개방전으로 영구 해금하거나 일반 런을 시작하세요. 저장 데이터가 있으면 이어하기가 표시됩니다.</text>

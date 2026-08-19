@@ -37,10 +37,13 @@
   <text id="ui_RestShow">返回</text>
   <text id="ui_Realization">解放战</text>
   <text id="ui_RMR_RealizationTitle">解放战</text>
+  <text id="ui_RMR_RealizationSubtitle">LIBRARY OF RUINA · FLOOR REALIZATION PASS</text>
   <text id="ui_RMR_RealizationDesc">选择楼层后编队，直接挑战原版最终解放战（安吉拉/罗兰多阶段），不含前置异想体镇压。首胜永久解锁该层异想体与 E.G.O.；已通关可再战不发奖。</text>
+  <text id="ui_RMR_RealizationProgress">解放进度  {0} / {1}</text>
   <text id="ui_RMR_RealizationChallenge">挑战</text>
   <text id="ui_RMR_RealizationCleared">已完成</text>
   <text id="ui_RMR_RealizationReplay">已完成 · 可再战</text>
+  <text id="ui_RMR_RealizationFooter">Library of Ruina · Roguelike Mod Reborn</text>
   <text id="ui_RMR_RealizationClose">关闭</text>
   <text id="ui_RMR_HubTitle">Roguelike 开局</text>
   <text id="ui_RMR_HubDesc">可先挑战解放战以永久解锁奖励，或直接开始正常游玩。</text>

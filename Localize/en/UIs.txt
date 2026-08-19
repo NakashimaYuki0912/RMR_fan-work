@@ -37,10 +37,13 @@
   <text id="ui_RestShow">Return</text>
   <text id="ui_Realization">Realization</text>
   <text id="ui_RMR_RealizationTitle">Floor Realization</text>
+  <text id="ui_RMR_RealizationSubtitle">LIBRARY OF RUINA · FLOOR REALIZATION PASS</text>
   <text id="ui_RMR_RealizationDesc">Pick a floor, form a team, then fight the vanilla final Floor Realization (Angela/Roland multi-phase). No prior abnormality suppressions. First clear permanently unlocks that floor's pages; re-clears give no rewards.</text>
+  <text id="ui_RMR_RealizationProgress">Realization Progress  {0} / {1}</text>
   <text id="ui_RMR_RealizationChallenge">Challenge</text>
   <text id="ui_RMR_RealizationCleared">Cleared</text>
-  <text id="ui_RMR_RealizationReplay">Cleared 路 Replay</text>
+  <text id="ui_RMR_RealizationReplay">Cleared · Replay</text>
+  <text id="ui_RMR_RealizationFooter">Library of Ruina · Roguelike Mod Reborn</text>
   <text id="ui_RMR_RealizationClose">Close</text>
   <text id="ui_RMR_HubTitle">Roguelike Start</text>
   <text id="ui_RMR_HubDesc">Choose how to begin. Realization unlocks permanent rewards; Normal Play starts a run. Continue appears when a save exists.</text>

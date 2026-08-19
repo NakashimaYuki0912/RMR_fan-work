@@ -3165,6 +3165,39 @@ namespace abcdcode_LOGLIKE_MOD
     public class LogLikePatches
     {
         #region PREFIXES 
+
+        /// <summary>
+        /// Compendium-projected librarians do not carry vanilla BattleDialogModel instances.
+        /// During the Hokma final battle, vanilla dereferences that null model for a non-Sephirah
+        /// death and also probes unlocalized kill/special-event keys. Preserve the canonical
+        /// start/death realization dialogue and silence dialogue types for which vanilla ships no key.
+        /// </summary>
+        [HarmonyPrefix, HarmonyPatch(typeof(CreatureBattleDialogueLoader), nameof(CreatureBattleDialogueLoader.GetDialogue))]
+        public static bool CreatureBattleDialogueLoader_GetDialogue(
+            CreatureBattleDialogueLoader __instance,
+            BattleUnitModel model,
+            DialogType dlgType,
+            ref string __result)
+        {
+            if (!RMRRealizationManager.InRealizationBattle
+                || RMRRealizationManager.CurrentRealizationFloor != SephirahType.Hokma
+                || model == null
+                || model.faction != Faction.Player)
+                return true;
+
+            bool isSephirah = model.UnitData != null
+                && model.UnitData.unitData != null
+                && model.UnitData.unitData.isSephirah;
+            if (dlgType == DialogType.START_BATTLE
+                || (dlgType == DialogType.DEATH && isSephirah))
+                return true;
+
+            // Vanilla only ships WhiteNight start lines plus the Hokma death line.
+            // Projected librarians have no generic BattleDialogModel to fall back to.
+            __result = string.Empty;
+            return false;
+        }
+
         /// <summary>
         /// Prefix patch to hijack the abnormality page get card id method to support the reward dictionary.
         /// </summary>

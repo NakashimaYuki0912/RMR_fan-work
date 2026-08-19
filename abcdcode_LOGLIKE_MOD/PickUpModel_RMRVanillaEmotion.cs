@@ -14,6 +14,7 @@ using UnityEngine;
 namespace abcdcode_LOGLIKE_MOD
 {
     /// <summary>Pickup model: PickUpModel_RMRVanillaEmotion</summary>
+    [HideFromItemCatalog]
     public class PickUpModel_RMRVanillaEmotion : PickUpModelBase
     {
         private readonly string _script;
